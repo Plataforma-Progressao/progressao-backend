@@ -53,6 +53,7 @@ NODE_ENV=development
 PORT=3000
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/progressao_docente?schema=public"
 JWT_SECRET="dev_secret_change_me_please"
+JWT_REFRESH_SECRET="dev_refresh_secret_change_me"
 JWT_EXPIRES_IN="1d"
 JWT_EXPIRES_IN_SECONDS=86400
 CORS_ORIGIN="http://localhost:3000,http://localhost:5173"
@@ -115,6 +116,22 @@ npm run start:prod
 ```
 
 A API estará disponível em **`http://localhost:3000/api`**.
+
+## 👤 Usuário Default Para Testes
+
+Para testar sem criar conta manualmente, rode o seed:
+
+```bash
+npm run prisma:seed
+```
+
+Após isso, você pode fazer login com o usuário admin padrão:
+
+- Email: `admin@progressao.uf.br`
+- Senha: `Admin@123456`
+- Role: `ADMIN`
+
+Esses valores vêm das variáveis `ADMIN_EMAIL`, `ADMIN_PASSWORD` e `ADMIN_NAME` no `.env`. Se você alterar essas variáveis, o seed passa a usar os novos dados.
 
 ## 📚 Estrutura de Pastas
 

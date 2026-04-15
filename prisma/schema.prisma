@@ -15,7 +15,20 @@ model User {
   id           String   @id @default(uuid())
   email        String   @unique
   name         String
+  cpf          String?  @unique
+  university   String?
+  center       String?
+  department   String?
+  practiceAreas String[] @default([])
+  careerClass  String?  @map("career_class")
+  currentLevel String?  @map("current_level")
+  lastProgressionDate DateTime? @map("last_progression_date")
+  acceptTerms  Boolean  @default(false) @map("accept_terms")
+  acceptLgpd   Boolean  @default(false) @map("accept_lgpd")
   passwordHash String   @map("password_hash")
+  refreshTokenHash String? @map("refresh_token_hash")
+  resetPasswordTokenHash String? @map("reset_password_token_hash")
+  resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
   role         Role     @default(USER)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

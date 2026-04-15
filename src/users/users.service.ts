@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../common/enums/role.enum';
 import { PublicUser } from '../common/types/public-user.type';
 import { PrismaService } from '../prisma/prisma.service';
+import { RegisterUserInput } from '../common/interfaces/register-user-input.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
@@ -34,15 +35,85 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-    const createdUser = await this.prisma.user.create({
-      data: {
-        email: createUserDto.email,
-        name: createUserDto.name,
-        passwordHash,
-        role: (createUserDto.role as PrismaRole | undefined) ?? PrismaRole.USER,
+    let createdUser: {
+      id: string;
+      email: string;
+      name: string;
+      role: PrismaRole;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+
+    try {
+      createdUser = await this.prisma.user.create({
+        data: {
+          email: createUserDto.email,
+          name: createUserDto.name,
+          passwordHash,
+          role: PrismaRole.USER,
+        },
+        select: this.userPublicSelect,
+      });
+    } catch (error: unknown) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('Dados de cadastro ja utilizados.');
+      }
+
+      throw error;
+    }
+
+    return this.toPublicUser(createdUser);
+  }
+
+  async createFromRegistration(data: RegisterUserInput): Promise<PublicUser> {
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: data.email }, { cpf: data.cpf }],
       },
-      select: this.userPublicSelect,
     });
+
+    if (existingUser) {
+      throw new ConflictException('Dados de cadastro ja utilizados.');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    let createdUser: {
+      id: string;
+      email: string;
+      name: string;
+      role: PrismaRole;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+
+    try {
+      createdUser = await this.prisma.user.create({
+        data: {
+          email: data.email,
+          name: data.fullName,
+          cpf: data.cpf,
+          university: data.university,
+          center: data.center,
+          department: data.department,
+          practiceAreas: data.practiceAreas,
+          careerClass: data.careerClass,
+          currentLevel: data.currentLevel,
+          lastProgressionDate: data.lastProgressionDate,
+          acceptTerms: data.acceptTerms,
+          acceptLgpd: data.acceptLgpd,
+          passwordHash,
+          role: PrismaRole.USER,
+        },
+        select: this.userPublicSelect,
+      });
+    } catch (error: unknown) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('Dados de cadastro ja utilizados.');
+      }
+
+      throw error;
+    }
 
     return this.toPublicUser(createdUser);
   }
@@ -62,6 +133,96 @@ export class UsersService {
 
   async findByEmailWithPassword(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });
+  }
+
+  async findByIdWithSensitiveFields(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  async setRefreshTokenHash(
+    userId: string,
+    refreshTokenHash: string | null,
+  ): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { id: userId },
+      data: { refreshTokenHash },
+    });
+  }
+
+  async rotateRefreshTokenHash(
+    userId: string,
+    currentRefreshTokenHash: string,
+    newRefreshTokenHash: string,
+  ): Promise<boolean> {
+    const result = await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        refreshTokenHash: currentRefreshTokenHash,
+      },
+      data: {
+        refreshTokenHash: newRefreshTokenHash,
+      },
+    });
+
+    return result.count === 1;
+  }
+
+  async setResetPasswordToken(
+    email: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordTokenHash: tokenHash,
+        resetPasswordExpiresAt: expiresAt,
+      },
+    });
+  }
+
+  async findByResetPasswordTokenHash(tokenHash: string): Promise<User | null> {
+    return this.prisma.user.findFirst({
+      where: {
+        resetPasswordTokenHash: tokenHash,
+        resetPasswordExpiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+  }
+
+  async clearResetPasswordToken(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        resetPasswordTokenHash: null,
+        resetPasswordExpiresAt: null,
+      },
+    });
+  }
+
+  async updatePassword(userId: string, password: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        refreshTokenHash: null,
+        resetPasswordTokenHash: null,
+        resetPasswordExpiresAt: null,
+      },
+    });
   }
 
   async findAll(): Promise<PublicUser[]> {
@@ -89,5 +250,12 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
   }
 }

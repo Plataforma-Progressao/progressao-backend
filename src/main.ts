@@ -9,17 +9,17 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
 
   const corsOrigin = configService.get<string>('CORS_ORIGIN', '*');
-  const resolvedOrigins =
-    corsOrigin === '*'
-      ? true
-      : corsOrigin
-          .split(',')
-          .map((origin) => origin.trim())
-          .filter((origin) => origin.length > 0);
+  const allowAnyOrigin = corsOrigin === '*';
+  const resolvedOrigins = allowAnyOrigin
+    ? true
+    : corsOrigin
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0);
 
   app.enableCors({
     origin: resolvedOrigins,
-    credentials: true,
+    credentials: !allowAnyOrigin,
   });
 
   app.setGlobalPrefix('api');

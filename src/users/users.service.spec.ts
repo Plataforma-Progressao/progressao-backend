@@ -13,19 +13,35 @@ describe('UsersService', () => {
   let usersService: UsersService;
   let prismaService: PrismaService;
 
-  const mockPublicUser = {
+  const createMockUser = (overrides = {}) => ({
     id: 'user-uuid',
     email: 'test@example.com',
     name: 'Test User',
+    cpf: null,
+    university: null,
+    center: null,
+    department: null,
+    practiceAreas: [],
+    careerClass: null,
+    currentLevel: null,
+    lastProgressionDate: null,
+    acceptTerms: false,
+    acceptLgpd: false,
+    passwordHash: 'hashed-password',
+    refreshTokenHash: null,
+    resetPasswordTokenHash: null,
+    resetPasswordExpiresAt: null,
     role: Role.USER,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+    ...overrides,
+  });
 
-  const mockUserWithPassword = {
-    ...mockPublicUser,
+  const mockPublicUser = createMockUser({ passwordHash: null });
+
+  const mockUserWithPassword = createMockUser({
     passwordHash: 'hashed-password',
-  };
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
