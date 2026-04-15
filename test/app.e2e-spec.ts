@@ -2,6 +2,7 @@
 import * as bcrypt from 'bcrypt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { TransformResponseInterceptor } from './../src/common/interceptors/transform-response.interceptor';
