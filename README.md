@@ -26,6 +26,28 @@ Este é o servidor NestJS que fornece APIs REST para:
 - **Container**: Docker + Docker Compose
 - **Testes**: Jest + Supertest (unit e e2e)
 
+## 🌐 Ambiente hospedado (Vercel + Supabase)
+
+Existe um deploy de referência da API na **Vercel**, usando **PostgreSQL gerenciado pelo Supabase** como banco em nuvem. No painel da Vercel, `DATABASE_URL` deve ser a connection string do projeto Supabase (modo que o Supabase recomendar para servidores — em geral com **SSL**).
+
+| Ambiente        | URL |
+| --------------- | --- |
+| **API**         | [https://progressao-backend.vercel.app/](https://progressao-backend.vercel.app/) |
+| **Front-end**   | [https://progressao-frontend.vercel.app/](https://progressao-frontend.vercel.app/) |
+
+- Rotas HTTP da API ficam sob o prefixo **`/api`** (ex.: `https://progressao-backend.vercel.app/api/...`).
+- O deploy usa o entrypoint serverless em `api/index.ts` com build `@vercel/node`; a configuração está em `vercel.json`.
+- No handler da Vercel, o **CORS** está configurado com `origin: true` (reflete a origem da requisição), o que permite que o front na Vercel chame a API sem ajuste manual de lista de origens nesse entrypoint.
+
+**Variáveis na Vercel:** além de `DATABASE_URL` (Supabase), defina os mesmos segredos exigidos em produção, por exemplo `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` (em produção a senha de admin tem requisito mínimo de tamanho — ver validação em `src/config/env.validation.ts`). Após conectar o banco, aplique migrations e rode o seed se precisar do usuário admin inicial:
+
+```bash
+npm run prisma:migrate:deploy
+npm run prisma:seed
+```
+
+(Execute com `DATABASE_URL` do Supabase disponível no ambiente, por exemplo na máquina local apontando para o projeto remoto ou no pipeline de deploy.)
+
 ## 🚀 Quick Start
 
 ### Pré-requisitos
@@ -132,6 +154,8 @@ Após isso, você pode fazer login com o usuário admin padrão:
 - Role: `ADMIN`
 
 Esses valores vêm das variáveis `ADMIN_EMAIL`, `ADMIN_PASSWORD` e `ADMIN_NAME` no `.env`. Se você alterar essas variáveis, o seed passa a usar os novos dados.
+
+No **ambiente hospedado** (Vercel + Supabase), as mesmas credenciais só funcionam se o seed tiver sido executado contra esse banco e se as variáveis de admin no ambiente corresponderem.
 
 ## 📚 Estrutura de Pastas
 
@@ -648,6 +672,7 @@ Antes de fazer deploy:
 
 - [ ] Mudar `JWT_SECRET` para valor forte (min 32 caracteres)
 - [ ] Node.js versão 20.19+ em produção
+- [ ] `DATABASE_URL` de produção (ex.: **Supabase**) configurado como secret na Vercel, com SSL conforme a documentação do provedor
 - [ ] PostgreSQL com backup configurado
 - [ ] Conexão DB com SSL
 - [ ] Variáveis de ambiente seguras (secrets manager)
