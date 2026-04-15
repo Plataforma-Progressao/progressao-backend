@@ -13,12 +13,12 @@ async function bootstrap(): Promise<void> {
   const resolvedOrigins = allowAnyOrigin
     ? true
     : corsOrigin
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0);
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
 
   app.enableCors({
-    origin: resolvedOrigins,
+    origin: true,
     credentials: !allowAnyOrigin,
   });
 
