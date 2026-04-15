@@ -18,8 +18,13 @@ async function bootstrap(): Promise<void> {
       .filter((origin) => origin.length > 0);
 
   app.enableCors({
-    origin: true,
+    origin: allowAnyOrigin ? true : resolvedOrigins,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders:
+      'Origin,X-Requested-With,Content-Type,Accept,Authorization,X-CSRF-Token,X-Api-Version',
     credentials: !allowAnyOrigin,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   app.setGlobalPrefix('api');
