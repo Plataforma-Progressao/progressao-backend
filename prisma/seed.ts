@@ -1,5 +1,17 @@
+import 'dotenv/config';
+
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required to run the seed.');
+  }
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter });
+}
 
 async function seedAdminUser(prisma: PrismaClient): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@progressao.uf.br';
@@ -25,7 +37,7 @@ async function seedAdminUser(prisma: PrismaClient): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
+  const prisma = createPrismaClient();
 
   try {
     await seedAdminUser(prisma);
