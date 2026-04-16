@@ -208,6 +208,83 @@ test/
 └── app.e2e-spec.ts      # Testes e2e
 ```
 
+## 🤝 Guia de contribuição (Backend)
+
+Esta seção define o padrão para evolução do backend por todos os devs.
+
+### Princípios de arquitetura
+
+- Organização por domínio/módulo (`auth`, `users`, etc.).
+- Regra de negócio em `service`; controller apenas orquestra request/response.
+- Acesso a dados isolado (Prisma/service específico), sem espalhar queries em controllers.
+- Reuso de utilitários transversais em `src/common`.
+- APIs devem manter envelope consistente (`success`, `data`, `error`, `meta` quando aplicável).
+
+### Como criar um novo módulo
+
+Use o Nest CLI para gerar a base e depois ajuste para o padrão do projeto:
+
+```bash
+# Exemplo para um módulo "relatorios"
+npx nest g module relatorios
+npx nest g controller relatorios --no-spec
+npx nest g service relatorios --no-spec
+```
+
+Fluxo recomendado:
+
+1. Criar módulo, controller e service.
+2. Criar DTOs em `src/<modulo>/dto` com `class-validator`.
+3. Definir contratos/interfaces em `src/<modulo>/interfaces` quando necessário.
+4. Implementar regra de negócio no `service`.
+5. Adicionar guards/decorators de autorização quando a rota exigir autenticação/RBAC.
+6. Cobrir com testes unitários (`*.spec.ts`) e e2e para fluxos críticos.
+7. Se houver mudança de banco, criar migration Prisma e atualizar seed quando necessário.
+
+### Convenções obrigatórias de código
+
+- TypeScript estrito, sem `any` em código de aplicação.
+- Validar input em borda de API (DTO + ValidationPipe).
+- Em `ValidationPipe`, usar opções estritas (`whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`).
+- Erros tratados explicitamente, com mensagens seguras para cliente.
+- Sem `console.log` em produção.
+- Nomes semânticos, funções pequenas e responsabilidades claras.
+- Evitar mutação de objetos compartilhados; preferir operações imutáveis.
+
+### SOLID aplicado ao NestJS
+
+- **S (Single Responsibility):** controller não contém regra de negócio; service não contém regra de transporte HTTP.
+- **O (Open/Closed):** estender comportamento por novos providers/estratégias ao invés de editar fluxos estáveis.
+- **L (Liskov):** implementações devem respeitar contratos (interfaces/types) publicados.
+- **I (Interface Segregation):** interfaces pequenas e orientadas ao caso de uso.
+- **D (Dependency Inversion):** depender de abstrações e injeção de dependência, evitando acoplamento rígido.
+
+### Padrões de segurança (obrigatório)
+
+- Nunca hardcode de secrets (usar variáveis de ambiente).
+- Senhas sempre com hash (`bcrypt`), sem retorno em payloads.
+- JWT obrigatório em rotas protegidas e RBAC quando aplicável.
+- Sempre validar e sanitizar entrada externa.
+- Evitar vazamento de detalhes internos em mensagens de erro.
+- Respeitar throttling global e por rota para endpoints sensíveis.
+
+### Banco de dados e Prisma
+
+- Toda alteração de schema deve virar migration versionada em `prisma/migrations`.
+- Não editar migration já aplicada em ambiente compartilhado.
+- Revisar impacto de índices/constraints em queries críticas.
+- Atualizar seed quando o fluxo de onboarding depender de novos campos obrigatórios.
+
+### Checklist antes de abrir PR
+
+1. `npm run lint` sem erros.
+2. `npm run build` sem erros.
+3. `npm test` passando.
+4. Para mudanças críticas de fluxo HTTP, rodar também `npm run test:e2e`.
+5. Para alteração de schema, validar migration com `npm run prisma:migrate:status`.
+6. Sem hardcode de segredo, token ou credencial.
+7. Endpoints novos/alterados documentados no README (ou documentação técnica associada).
+
 ## 🔐 Autenticação e Autorização
 
 ### Registrar Novo Usuário

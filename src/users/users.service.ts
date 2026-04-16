@@ -24,6 +24,23 @@ export class UsersService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async findDashboardProfileById(id: string): Promise<{
+    id: string;
+    name: string;
+    careerClass: string | null;
+    currentLevel: string | null;
+  } | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        careerClass: true,
+        currentLevel: true,
+      },
+    });
+  }
+
   async create(createUserDto: CreateUserDto): Promise<PublicUser> {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: createUserDto.email },

@@ -57,38 +57,38 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(120)
-  fullName: string;
+  fullName!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeCpf(value))
   @IsString()
   @Matches(/^\d{11}$/, { message: 'CPF deve conter 11 digitos.' })
-  cpf: string;
+  cpf!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value))
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(120)
-  university: string;
+  university!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(120)
-  center: string;
+  center!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(120)
-  department: string;
+  department!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizePracticeAreas(value))
   @IsArray()
@@ -96,25 +96,25 @@ export class RegisterDto {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   @MaxLength(80, { each: true })
-  practiceAreas: string[];
+  practiceAreas!: string[];
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(60)
-  careerClass: string;
+  careerClass!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(1)
   @MaxLength(40)
-  currentLevel: string;
+  currentLevel!: string;
 
   @Type(() => Date)
   @IsDate()
-  lastProgressionDate: Date;
+  lastProgressionDate!: Date;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
@@ -124,7 +124,7 @@ export class RegisterDto {
   @Matches(PASSWORD_POLICY_REGEX, {
     message: 'Senha deve conter pelo menos uma letra e um numero.',
   })
-  password: string;
+  password!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
@@ -134,13 +134,13 @@ export class RegisterDto {
   @Match<RegisterDto>('password', {
     message: 'Confirmacao de senha deve ser igual a senha.',
   })
-  confirmPassword: string;
+  confirmPassword!: string;
 
   @IsBoolean()
   @Equals(true, { message: 'Aceite dos termos e obrigatorio.' })
-  acceptTerms: boolean;
+  acceptTerms!: boolean;
 
   @IsBoolean()
   @Equals(true, { message: 'Aceite da LGPD e obrigatorio.' })
-  acceptLgpd: boolean;
+  acceptLgpd!: boolean;
 }

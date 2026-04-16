@@ -21,7 +21,7 @@ export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(32)
-  token: string;
+  token!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
@@ -31,7 +31,7 @@ export class ResetPasswordDto {
   @Matches(PASSWORD_POLICY_REGEX, {
     message: 'Senha deve conter pelo menos uma letra e um numero.',
   })
-  password: string;
+  password!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
@@ -41,5 +41,5 @@ export class ResetPasswordDto {
   @Match<ResetPasswordDto>('password', {
     message: 'Confirmacao de senha deve ser igual a senha.',
   })
-  confirmPassword: string;
+  confirmPassword!: string;
 }

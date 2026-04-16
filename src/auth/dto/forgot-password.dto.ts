@@ -12,5 +12,5 @@ function normalizeEmail(value: unknown): unknown {
 export class ForgotPasswordDto {
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value))
   @IsEmail()
-  email: string;
+  email!: string;
 }

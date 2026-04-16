@@ -32,7 +32,7 @@ export class LoginDto {
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value))
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @Transform(({ value }: { value: unknown }) => normalizeText(value))
   @IsString()
@@ -40,5 +40,5 @@ export class LoginDto {
   @MinLength(PASSWORD_MIN_LENGTH)
   @MaxLength(PASSWORD_MAX_LENGTH)
   @Matches(/\S/, { message: 'Senha nao pode conter apenas espacos.' })
-  password: string;
+  password!: string;
 }
