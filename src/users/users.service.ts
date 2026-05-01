@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, Role as PrismaRole, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +12,7 @@ import { PublicUser } from '../common/types/public-user.type';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterUserInput } from '../common/interfaces/register-user-input.interface';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +21,8 @@ export class UsersService {
     email: true,
     name: true,
     role: true,
+    lattesUrl: true,
+    orcid: true,
     createdAt: true,
     updatedAt: true,
   } satisfies Prisma.UserSelect;
@@ -57,6 +62,8 @@ export class UsersService {
       email: string;
       name: string;
       role: PrismaRole;
+      lattesUrl: string | null;
+      orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
     };
@@ -100,6 +107,8 @@ export class UsersService {
       email: string;
       name: string;
       role: PrismaRole;
+      lattesUrl: string | null;
+      orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
     };
@@ -251,11 +260,83 @@ export class UsersService {
     return users.map((user) => this.toPublicUser(user));
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<PublicUser> {
+    const trimmedLattes =
+      dto.lattesUrl !== undefined ? dto.lattesUrl.trim() || null : undefined;
+    const trimmedOrcid =
+      dto.orcid !== undefined ? dto.orcid.trim() || null : undefined;
+
+    const data: Prisma.UserUpdateInput = {};
+
+    if (dto.name !== undefined) {
+      data.name = dto.name.trim();
+    }
+
+    if (trimmedLattes !== undefined) {
+      data.lattesUrl = trimmedLattes;
+    }
+
+    if (trimmedOrcid !== undefined) {
+      data.orcid = trimmedOrcid;
+    }
+
+    const newPassword = dto.newPassword?.trim();
+    if (newPassword) {
+      if (!dto.currentPassword) {
+        throw new BadRequestException('Informe a senha atual para alterar a senha.');
+      }
+
+      const userWithSecret = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true },
+      });
+
+      if (!userWithSecret) {
+        throw new NotFoundException('Usuario nao encontrado.');
+      }
+
+      const currentMatches = await bcrypt.compare(
+        dto.currentPassword,
+        userWithSecret.passwordHash,
+      );
+
+      if (!currentMatches) {
+        throw new UnauthorizedException('Senha atual incorreta.');
+      }
+
+      data.passwordHash = await bcrypt.hash(newPassword, 10);
+      data.refreshTokenHash = null;
+      data.resetPasswordTokenHash = null;
+      data.resetPasswordExpiresAt = null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.findById(userId);
+    }
+
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data,
+      });
+    } catch (error: unknown) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('Dados de perfil ja utilizados.');
+      }
+
+      throw error;
+    }
+
+    return this.findById(userId);
+  }
+
   private toPublicUser(user: {
     id: string;
     email: string;
     name: string;
     role: PrismaRole;
+    lattesUrl: string | null;
+    orcid: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): PublicUser {
@@ -264,6 +345,8 @@ export class UsersService {
       email: user.email,
       name: user.name,
       role: user.role as Role,
+      lattesUrl: user.lattesUrl,
+      orcid: user.orcid,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

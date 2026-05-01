@@ -25,6 +25,8 @@ model User {
   lastProgressionDate DateTime? @map("last_progression_date")
   acceptTerms  Boolean  @default(false) @map("accept_terms")
   acceptLgpd   Boolean  @default(false) @map("accept_lgpd")
+  lattesUrl    String?  @map("lattes_url")
+  orcid        String?
   passwordHash String   @map("password_hash")
   refreshTokenHash String? @map("refresh_token_hash")
   resetPasswordTokenHash String? @map("reset_password_token_hash")

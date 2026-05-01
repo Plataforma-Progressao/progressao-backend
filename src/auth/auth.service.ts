@@ -108,6 +108,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role as Role,
+      lattesUrl: user.lattesUrl ?? null,
+      orcid: user.orcid ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

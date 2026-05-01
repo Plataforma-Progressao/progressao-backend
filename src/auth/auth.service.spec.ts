@@ -27,6 +27,8 @@ describe('AuthService', () => {
     email: 'test@example.com',
     name: 'Test User',
     role: Role.USER,
+    lattesUrl: null,
+    orcid: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '../common/enums/role.enum';
+import { PublicUser } from '../common/types/public-user.type';
 import { CreateUserDto } from './dto/create-user.dto';
 
 jest.mock('bcrypt');
@@ -27,6 +28,8 @@ describe('UsersService', () => {
     lastProgressionDate: null,
     acceptTerms: false,
     acceptLgpd: false,
+    lattesUrl: null,
+    orcid: null,
     passwordHash: 'hashed-password',
     refreshTokenHash: null,
     resetPasswordTokenHash: null,
@@ -41,6 +44,18 @@ describe('UsersService', () => {
 
   const mockUserWithPassword = createMockUser({
     passwordHash: 'hashed-password',
+  });
+
+  const expectedPublicUser = (overrides: Partial<PublicUser> = {}): PublicUser => ({
+    id: mockPublicUser.id,
+    email: mockPublicUser.email,
+    name: mockPublicUser.name,
+    role: mockPublicUser.role as Role,
+    lattesUrl: mockPublicUser.lattesUrl ?? null,
+    orcid: mockPublicUser.orcid ?? null,
+    createdAt: mockPublicUser.createdAt,
+    updatedAt: mockPublicUser.updatedAt,
+    ...overrides,
   });
 
   beforeEach(async () => {
@@ -84,10 +99,9 @@ describe('UsersService', () => {
 
       const result = await usersService.create(createUserDto);
 
-      expect(result).toEqual({
-        ...mockPublicUser,
-        email: createUserDto.email,
-      });
+      expect(result).toEqual(
+        expectedPublicUser({ email: createUserDto.email }),
+      );
       expect(result).not.toHaveProperty('passwordHash');
       expect(prismaService.user.create).toHaveBeenCalled();
     });
@@ -155,7 +169,7 @@ describe('UsersService', () => {
 
       const result = await usersService.findById('user-uuid');
 
-      expect(result).toEqual(mockPublicUser);
+      expect(result).toEqual(expectedPublicUser());
       expect(result).not.toHaveProperty('passwordHash');
     });
 
@@ -195,14 +209,8 @@ describe('UsersService', () => {
   describe('findAll', () => {
     it('should return all users ordered by createdAt descending, no passwordHash', async () => {
       const mockUsers = [
-        {
-          ...mockPublicUser,
-          id: 'uuid-1',
-        },
-        {
-          ...mockPublicUser,
-          id: 'uuid-2',
-        },
+        expectedPublicUser({ id: 'uuid-1' }),
+        expectedPublicUser({ id: 'uuid-2' }),
       ];
 
       jest.spyOn(prismaService.user, 'findMany').mockResolvedValue(mockUsers);
