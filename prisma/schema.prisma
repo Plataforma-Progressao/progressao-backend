@@ -11,29 +11,258 @@ enum Role {
   USER
 }
 
+enum ActivityCategory {
+  TEACHING
+  RESEARCH
+  OUTREACH
+  MANAGEMENT
+}
+
+enum ActivityStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EvidenceType {
+  FILE
+  LINK
+}
+
+enum ChecklistItemStatus {
+  PENDING
+  ATTENTION
+  COMPLETED
+}
+
+enum NotificationTone {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String
-  cpf          String?  @unique
-  university   String?
-  center       String?
-  department   String?
-  practiceAreas String[] @default([])
-  careerClass  String?  @map("career_class")
-  currentLevel String?  @map("current_level")
-  lastProgressionDate DateTime? @map("last_progression_date")
-  acceptTerms  Boolean  @default(false) @map("accept_terms")
-  acceptLgpd   Boolean  @default(false) @map("accept_lgpd")
-  lattesUrl    String?  @map("lattes_url")
-  orcid        String?
-  passwordHash String   @map("password_hash")
-  refreshTokenHash String? @map("refresh_token_hash")
-  resetPasswordTokenHash String? @map("reset_password_token_hash")
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  name                   String
+  cpf                    String?   @unique
+  siapeId                String?   @unique @map("siape_id")
+  workRegime             String?   @map("work_regime")
+  university             String?
+  center                 String?
+  department             String?
+  practiceAreas          String[]  @default([])
+  careerClass            String?   @map("career_class")
+  currentLevel           String?   @map("current_level")
+  lastProgressionDate    DateTime? @map("last_progression_date")
+  acceptTerms            Boolean   @default(false) @map("accept_terms")
+  acceptLgpd             Boolean   @default(false) @map("accept_lgpd")
+  lattesUrl              String?   @map("lattes_url")
+  orcid                  String?
+  passwordHash           String    @map("password_hash")
+  refreshTokenHash       String?   @map("refresh_token_hash")
+  resetPasswordTokenHash String?   @map("reset_password_token_hash")
   resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  role                   Role      @default(USER)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  activities        Activity[]
+  progressionCycles ProgressionCycle[]
+  checklistItems    UserChecklistItem[]
+  notifications     Notification[]
+  reportSnapshots   ReportSnapshot[]
+  scoreSummaries    UserScoreSummary[]
+  reviewedActivities Activity[]             @relation("ActivityReviewer")
+  uploadedEvidences  ActivityEvidence[]     @relation("EvidenceUploader")
+  statusChanges      ActivityStatusHistory[] @relation("StatusChangedBy")
+  reviewedChecklistItems UserChecklistItem[] @relation("ChecklistReviewer")
 
   @@map("users")
+}
+
+model ProgressionCycle {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  label         String
+  startsAt      DateTime @map("starts_at")
+  endsAt        DateTime @map("ends_at")
+  statusLabel   String?  @map("status_label")
+  issuedAtLabel String?  @map("issued_at_label")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities     Activity[]
+  checklistItems UserChecklistItem[]
+  reportSnapshots ReportSnapshot[]
+  scoreSummaries UserScoreSummary[]
+
+  @@index([userId, isActive], map: "idx_progression_cycle_user_active")
+  @@map("progression_cycles")
+}
+
+model Activity {
+  id                 String           @id @default(uuid())
+  userId             String           @map("user_id")
+  progressionCycleId String?          @map("progression_cycle_id")
+  title              String
+  description        String
+  category           ActivityCategory
+  workloadHours      Int              @map("workload_hours")
+  score              Decimal          @db.Decimal(10, 2)
+  term               String?
+  kind               String?
+  status             ActivityStatus   @default(PENDING)
+  submittedAt        DateTime?        @map("submitted_at")
+  reviewedAt         DateTime?        @map("reviewed_at")
+  reviewerId         String?          @map("reviewer_id")
+  rejectionReason    String?          @map("rejection_reason")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progressionCycle ProgressionCycle?     @relation(fields: [progressionCycleId], references: [id], onDelete: SetNull)
+  reviewer         User?                 @relation("ActivityReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  evidences        ActivityEvidence[]
+  statusHistory    ActivityStatusHistory[]
+
+  @@index([userId, status], map: "idx_activity_user_status")
+  @@index([progressionCycleId], map: "idx_activity_cycle")
+  @@index([reviewerId], map: "idx_activity_reviewer")
+  @@map("activities")
+}
+
+model ActivityEvidence {
+  id             String       @id @default(uuid())
+  activityId     String       @map("activity_id")
+  type           EvidenceType @default(FILE)
+  filename       String?      @map("file_name")
+  originalName   String?      @map("original_name")
+  mimeType       String?      @map("mime_type")
+  sizeBytes      Int?         @map("size_bytes")
+  storagePath    String?      @map("storage_path")
+  externalUrl    String?      @map("external_url")
+  uploadedById   String?      @map("uploaded_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  uploadedBy User?    @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([activityId], map: "idx_evidence_activity")
+  @@index([uploadedById], map: "idx_evidence_uploader")
+  @@map("activity_evidences")
+}
+
+model ActivityStatusHistory {
+  id          String         @id @default(uuid())
+  activityId  String         @map("activity_id")
+  fromStatus  ActivityStatus @map("from_status")
+  toStatus    ActivityStatus @map("to_status")
+  note        String?
+  changedById String?        @map("changed_by_id")
+  changedAt   DateTime       @default(now()) @map("changed_at")
+
+  activity  Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  changedBy User?    @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([activityId, changedAt], map: "idx_activity_status_history")
+  @@map("activity_status_history")
+}
+
+model ChecklistTemplateItem {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  title       String
+  description String?
+  category    String?
+  requiredFor String?  @map("required_for")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  checklistItems UserChecklistItem[]
+
+  @@map("checklist_template_items")
+}
+
+model UserChecklistItem {
+  id                 String              @id @default(uuid())
+  userId             String              @map("user_id")
+  progressionCycleId String?             @map("progression_cycle_id")
+  templateItemId     String              @map("template_item_id")
+  status             ChecklistItemStatus @default(PENDING)
+  submittedAt        DateTime?           @map("submitted_at")
+  reviewedAt         DateTime?           @map("reviewed_at")
+  reviewerId         String?             @map("reviewer_id")
+  note               String?
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progressionCycle ProgressionCycle?   @relation(fields: [progressionCycleId], references: [id], onDelete: SetNull)
+  templateItem     ChecklistTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict)
+  reviewer         User?               @relation("ChecklistReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, progressionCycleId, templateItemId], map: "uq_checklist_user_cycle_item")
+  @@index([userId, status], map: "idx_checklist_user_status")
+  @@map("user_checklist_items")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  title     String
+  message   String
+  icon      String?
+  tone      NotificationTone @default(INFO)
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead], map: "idx_notification_user_read")
+  @@map("notifications")
+}
+
+model ReportSnapshot {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  progressionCycleId String?  @map("progression_cycle_id")
+  title              String
+  payload            Json
+  generatedAt        DateTime @default(now()) @map("generated_at")
+
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progressionCycle ProgressionCycle? @relation(fields: [progressionCycleId], references: [id], onDelete: SetNull)
+
+  @@index([userId, generatedAt], map: "idx_report_snapshot_user_date")
+  @@map("report_snapshots")
+}
+
+model UserScoreSummary {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  progressionCycleId String?  @map("progression_cycle_id")
+  scoreCurrent       Int      @default(0) @map("score_current")
+  scoreTarget        Int      @default(2000) @map("score_target")
+  teachingScore      Int      @default(0) @map("teaching_score")
+  researchScore      Int      @default(0) @map("research_score")
+  outreachScore      Int      @default(0) @map("outreach_score")
+  managementScore    Int      @default(0) @map("management_score")
+  progressPercentage Int      @default(0) @map("progress_percentage")
+  yearsInLevel       Int      @default(0) @map("years_in_level")
+  yearsRequired      Int      @default(4) @map("years_required")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progressionCycle ProgressionCycle? @relation(fields: [progressionCycleId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, progressionCycleId], map: "uq_user_score_cycle")
+  @@map("user_score_summaries")
 }

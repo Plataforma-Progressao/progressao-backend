@@ -16,6 +16,14 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { ActivitiesModule } from './activities/activities.module';
+import { ProgressionCyclesModule } from './progression-cycles/progression-cycles.module';
+import { ActivityEvidencesModule } from './activity-evidences/activity-evidences.module';
+import { ActivityStatusHistoryModule } from './activity-status-history/activity-status-history.module';
+import { ChecklistTemplateItemsModule } from './checklist-template-items/checklist-template-items.module';
+import { UserChecklistItemsModule } from './user-checklist-items/user-checklist-items.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReportSnapshotsModule } from './report-snapshots/report-snapshots.module';
+import { UserScoreSummariesModule } from './user-score-summaries/user-score-summaries.module';
 
 @Module({
   imports: [
@@ -35,6 +43,14 @@ import { ActivitiesModule } from './activities/activities.module';
     AuthModule,
     DashboardModule,
     ActivitiesModule,
+    ProgressionCyclesModule,
+    ActivityEvidencesModule,
+    ActivityStatusHistoryModule,
+    ChecklistTemplateItemsModule,
+    UserChecklistItemsModule,
+    NotificationsModule,
+    ReportSnapshotsModule,
+    UserScoreSummariesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -175,6 +175,30 @@ src/
 │   ├── users.controller.ts
 │   ├── users.service.ts
 │   └── users.module.ts
+├── progression-cycles/   # Ciclos de progressão por docente
+│   ├── progression-cycles.resource.ts
+│   └── progression-cycles.module.ts
+├── activity-evidences/   # Comprovantes de atividades
+│   ├── activity-evidences.resource.ts
+│   └── activity-evidences.module.ts
+├── activity-status-history/ # Histórico de status das atividades
+│   ├── activity-status-history.resource.ts
+│   └── activity-status-history.module.ts
+├── checklist-template-items/ # Itens de checklist institucional
+│   ├── checklist-template-items.resource.ts
+│   └── checklist-template-items.module.ts
+├── user-checklist-items/ # Checklist por usuário/ciclo
+│   ├── user-checklist-items.resource.ts
+│   └── user-checklist-items.module.ts
+├── notifications/        # Notificações do sistema
+│   ├── notifications.resource.ts
+│   └── notifications.module.ts
+├── report-snapshots/     # Snapshot JSON de relatórios
+│   ├── report-snapshots.resource.ts
+│   └── report-snapshots.module.ts
+├── user-score-summaries/ # Resumo de pontuação e progresso
+│   ├── user-score-summaries.resource.ts
+│   └── user-score-summaries.module.ts
 ├── prisma/              # Integração ORM global
 │   ├── prisma.service.ts
 │   └── prisma.module.ts
@@ -218,6 +242,75 @@ Esta seção define o padrão para evolução do backend por todos os devs.
 - Regra de negócio em `service`; controller apenas orquestra request/response.
 - Acesso a dados isolado (Prisma/service específico), sem espalhar queries em controllers.
 - Reuso de utilitários transversais em `src/common`.
+
+### Padrão de camadas adotado nos novos módulos
+
+Para os novos domínios foi adotado um esqueleto com 4 componentes principais:
+
+- **Module (`*.module.ts`)**
+  - Registra os providers e controllers do domínio.
+  - Expõe service para consumo por outros módulos quando necessário.
+- **Controller (`*Controller`)**
+  - Define rotas HTTP REST (`GET`, `POST`, `PATCH`, `DELETE`).
+  - Recebe request/params/body e delega ao service.
+- **Service (`*Service`)**
+  - Camada de aplicação/orquestração.
+  - Encaminha operações para o repository (sem regra de negócio pesada neste esqueleto).
+- **Repository (`*Repository`)**
+  - Encapsula acesso ao banco com Prisma.
+  - Centraliza consultas e comandos de persistência por entidade.
+
+> Observação: neste estágio foi criado apenas o esqueleto CRUD básico para acelerar a evolução. Regras de autorização, validações com DTOs específicos e casos de uso completos podem ser adicionados gradualmente.
+
+## 🧩 Entidades novas do domínio de progressão
+
+### `ProgressionCycle`
+
+- Representa um ciclo de progressão (ex.: biênio) por usuário.
+- Define período (`startsAt`, `endsAt`), rótulo e estado ativo.
+- Serve de contexto temporal para atividades, checklist, snapshots e score consolidado.
+
+### `ActivityEvidence`
+
+- Armazena comprovantes vinculados a uma atividade.
+- Suporta arquivo ou link (`type`), com metadados (`mimeType`, `sizeBytes`, `storagePath`, `externalUrl`).
+- Permite rastrear quem enviou (`uploadedById`).
+
+### `ActivityStatusHistory`
+
+- Mantém trilha de auditoria de mudanças de status da atividade.
+- Registra transição (`fromStatus` -> `toStatus`), usuário responsável e data de mudança.
+- Fundamental para histórico/validação e diagnóstico de fluxo.
+
+### `ChecklistTemplateItem`
+
+- Catálogo institucional de itens obrigatórios/esperados.
+- Pode ser reutilizado para todos os usuários e ciclos.
+- Define ordenação (`sortOrder`) e ativação/desativação (`isActive`).
+
+### `UserChecklistItem`
+
+- Instância do checklist para um usuário (e opcionalmente ciclo).
+- Guarda estado operacional (`PENDING`, `ATTENTION`, `COMPLETED`) e revisão.
+- Conecta o template institucional ao acompanhamento real do docente.
+
+### `Notification`
+
+- Notificações exibidas ao usuário com tom (`INFO`, `SUCCESS`, `WARNING`, `ERROR`).
+- Permite controle de leitura (`isRead`, `readAt`).
+- Útil para alertas de prazo, validações e mensagens sistêmicas.
+
+### `ReportSnapshot`
+
+- Snapshot persistido do relatório em formato JSON (`payload`).
+- Registra o conteúdo gerado em um instante (`generatedAt`) para histórico.
+- Dá previsibilidade em auditorias e comparações entre versões do relatório.
+
+### `UserScoreSummary`
+
+- Consolidação numérica de progresso por usuário/ciclo.
+- Guarda score atual/meta e totais por pilar (ensino, pesquisa, extensão, gestão).
+- Base para dashboard e indicadores agregados de avanço na carreira.
 - APIs devem manter envelope consistente (`success`, `data`, `error`, `meta` quando aplicável).
 
 ### Como criar um novo módulo
