@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
-import {
-  UserScoreSummariesController,
-  UserScoreSummariesRepository,
-  UserScoreSummariesService,
-} from './user-score-summaries.resource';
+import { UserScoreSummariesController } from './user-score-summaries.controller';
+import { UserScoreSummariesService } from './user-score-summaries.service';
 
 @Module({
   controllers: [UserScoreSummariesController],
-  providers: [UserScoreSummariesService, UserScoreSummariesRepository],
+  providers: [UserScoreSummariesService],
   exports: [UserScoreSummariesService],
 })
 export class UserScoreSummariesModule {}

@@ -176,28 +176,36 @@ src/
 │   ├── users.service.ts
 │   └── users.module.ts
 ├── progression-cycles/   # Ciclos de progressão por docente
-│   ├── progression-cycles.resource.ts
+│   ├── progression-cycles.controller.ts
+│   ├── progression-cycles.service.ts
 │   └── progression-cycles.module.ts
 ├── activity-evidences/   # Comprovantes de atividades
-│   ├── activity-evidences.resource.ts
+│   ├── activity-evidences.controller.ts
+│   ├── activity-evidences.service.ts
 │   └── activity-evidences.module.ts
 ├── activity-status-history/ # Histórico de status das atividades
-│   ├── activity-status-history.resource.ts
+│   ├── activity-status-history.controller.ts
+│   ├── activity-status-history.service.ts
 │   └── activity-status-history.module.ts
 ├── checklist-template-items/ # Itens de checklist institucional
-│   ├── checklist-template-items.resource.ts
+│   ├── checklist-template-items.controller.ts
+│   ├── checklist-template-items.service.ts
 │   └── checklist-template-items.module.ts
 ├── user-checklist-items/ # Checklist por usuário/ciclo
-│   ├── user-checklist-items.resource.ts
+│   ├── user-checklist-items.controller.ts
+│   ├── user-checklist-items.service.ts
 │   └── user-checklist-items.module.ts
 ├── notifications/        # Notificações do sistema
-│   ├── notifications.resource.ts
+│   ├── notifications.controller.ts
+│   ├── notifications.service.ts
 │   └── notifications.module.ts
 ├── report-snapshots/     # Snapshot JSON de relatórios
-│   ├── report-snapshots.resource.ts
+│   ├── report-snapshots.controller.ts
+│   ├── report-snapshots.service.ts
 │   └── report-snapshots.module.ts
 ├── user-score-summaries/ # Resumo de pontuação e progresso
-│   ├── user-score-summaries.resource.ts
+│   ├── user-score-summaries.controller.ts
+│   ├── user-score-summaries.service.ts
 │   └── user-score-summaries.module.ts
 ├── prisma/              # Integração ORM global
 │   ├── prisma.service.ts

@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
-import {
-  ChecklistTemplateItemsController,
-  ChecklistTemplateItemsRepository,
-  ChecklistTemplateItemsService,
-} from './checklist-template-items.resource';
+import { ChecklistTemplateItemsController } from './checklist-template-items.controller';
+import { ChecklistTemplateItemsService } from './checklist-template-items.service';
 
 @Module({
   controllers: [ChecklistTemplateItemsController],
-  providers: [ChecklistTemplateItemsService, ChecklistTemplateItemsRepository],
+  providers: [ChecklistTemplateItemsService],
   exports: [ChecklistTemplateItemsService],
 })
 export class ChecklistTemplateItemsModule {}

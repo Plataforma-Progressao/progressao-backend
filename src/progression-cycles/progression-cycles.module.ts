@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
-import {
-  ProgressionCyclesController,
-  ProgressionCyclesRepository,
-  ProgressionCyclesService,
-} from './progression-cycles.resource';
+import { ProgressionCyclesController } from './progression-cycles.controller';
+import { ProgressionCyclesService } from './progression-cycles.service';
 
 @Module({
   controllers: [ProgressionCyclesController],
-  providers: [ProgressionCyclesService, ProgressionCyclesRepository],
+  providers: [ProgressionCyclesService],
   exports: [ProgressionCyclesService],
 })
 export class ProgressionCyclesModule {}
