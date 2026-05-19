@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 
 async function bootstrap(): Promise<void> {
@@ -13,9 +14,9 @@ async function bootstrap(): Promise<void> {
   const resolvedOrigins = allowAnyOrigin
     ? true
     : corsOrigin
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter((origin) => origin.length > 0);
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0);
 
   app.enableCors({
     origin: allowAnyOrigin ? true : resolvedOrigins,
@@ -41,6 +42,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.useGlobalInterceptors(new TransformResponseInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   await app.listen(configService.get<number>('PORT', 3000));
 }
