@@ -22,7 +22,7 @@ export class CreateActivityDto {
   title!: string;
 
   @IsString()
-  @MinLength(20, { message: 'Descricao deve ter pelo menos 20 caracteres.' })
+  @MinLength(10, { message: 'Descricao deve ter pelo menos 10 caracteres.' })
   @MaxLength(1200, { message: 'Descricao deve ter no maximo 1200 caracteres.' })
   description!: string;
 

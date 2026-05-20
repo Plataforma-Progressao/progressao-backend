@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -21,6 +22,8 @@ import {
   ListActivitiesResponseDto,
   ActivityListItemDto,
 } from './dto/list-activities.dto';
+import { ListActivitiesQueryDto } from './dto/list-activities-query.dto';
+import { PaginatedActivitiesResponseDto } from './dto/paginated-activities-response.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { EstimateActivityScoreDto } from './dto/estimate-activity-score.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
@@ -50,8 +53,9 @@ export class ActivitiesController {
   @Get()
   async findAll(
     @Req() request: AuthenticatedRequest,
-  ): Promise<readonly ActivityListItemDto[]> {
-    return this.activitiesService.findAll(request.user.sub);
+    @Query() query: ListActivitiesQueryDto,
+  ): Promise<PaginatedActivitiesResponseDto> {
+    return this.activitiesService.findAllPaginated(request.user.sub, query);
   }
 
   @UseGuards(JwtAuthGuard)

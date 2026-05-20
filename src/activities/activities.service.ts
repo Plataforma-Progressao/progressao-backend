@@ -9,6 +9,8 @@ import {
   ActivityListItemDto,
   ListActivitiesResponseDto,
 } from './dto/list-activities.dto';
+import { ListActivitiesQueryDto } from './dto/list-activities-query.dto';
+import { PaginatedActivitiesResponseDto } from './dto/paginated-activities-response.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { EstimateActivityScoreDto } from './dto/estimate-activity-score.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
@@ -74,12 +76,26 @@ type ActivityUpdateInput = Partial<
   >
 >;
 
+type ActivityListWhere = {
+  userId: string;
+  category?: string;
+  status?: string;
+  term?: { startsWith: string };
+  OR?: Array<
+    | { title: { contains: string; mode: 'insensitive' } }
+    | { description: { contains: string; mode: 'insensitive' } }
+  >;
+};
+
 interface ActivitiesDatabase {
   activity: {
     findMany(args: {
-      where: { userId: string };
+      where: ActivityListWhere;
       orderBy: { createdAt: 'desc' };
+      skip?: number;
+      take?: number;
     }): Promise<ActivityRecord[]>;
+    count(args: { where: ActivityListWhere }): Promise<number>;
     findFirst(args: {
       where: { id: string; userId: string };
     }): Promise<ActivityRecord | null>;
@@ -140,13 +156,33 @@ export class ActivitiesService {
     };
   }
 
-  async findAll(userId: string): Promise<readonly ActivityListItemDto[]> {
-    const activities = await this.db.activity.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllPaginated(
+    userId: string,
+    query: ListActivitiesQueryDto,
+  ): Promise<PaginatedActivitiesResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const where = this.buildListWhere(userId, query);
 
-    return activities.map((activity) => this.toListItem(activity));
+    const [activities, total] = await Promise.all([
+      this.db.activity.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.db.activity.count({ where }),
+    ]);
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      items: activities.map((activity) => this.toListItem(activity)),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
   }
 
   async findById(userId: string, id: string): Promise<ActivityListItemDto> {
@@ -281,6 +317,36 @@ export class ActivitiesService {
       totalImpact,
       progressPercentage,
     };
+  }
+
+  private buildListWhere(
+    userId: string,
+    query: ListActivitiesQueryDto,
+  ): ActivityListWhere {
+    const where: ActivityListWhere = { userId };
+
+    if (query.category) {
+      where.category = query.category;
+    }
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    const term = query.term?.trim();
+    if (term) {
+      where.term = { startsWith: term };
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    return where;
   }
 
   private async findOwnedActivity(

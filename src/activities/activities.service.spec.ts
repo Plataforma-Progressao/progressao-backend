@@ -41,6 +41,7 @@ describe('ActivitiesService', () => {
             activity: {
               create: jest.fn(),
               findMany: jest.fn(),
+              count: jest.fn(),
               findFirst: jest.fn(),
               findUnique: jest.fn(),
               update: jest.fn(),
@@ -101,12 +102,18 @@ describe('ActivitiesService', () => {
     expect(result.score).toBe(dto.score);
   });
 
-  it('returns only the user activities ordered by newest first', async () => {
+  it('returns paginated user activities ordered by newest first', async () => {
     (
       prismaService as unknown as { activity: { findMany: jest.Mock } }
     ).activity.findMany.mockResolvedValueOnce([mockActivity]);
+    (
+      prismaService as unknown as { activity: { count: jest.Mock } }
+    ).activity.count.mockResolvedValueOnce(1);
 
-    const result = await service.findAll('user-1');
+    const result = await service.findAllPaginated('user-1', {
+      page: 1,
+      pageSize: 10,
+    });
 
     expect(
       (prismaService as unknown as { activity: { findMany: jest.Mock } })
@@ -115,10 +122,52 @@ describe('ActivitiesService', () => {
       expect.objectContaining({
         where: { userId: 'user-1' },
         orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 10,
       }),
     );
-    expect(result).toHaveLength(1);
-    expect(result[0]?.score).toBe(15.5);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.score).toBe(15.5);
+    expect(result.total).toBe(1);
+    expect(result.totalPages).toBe(1);
+  });
+
+  it('applies category, status, search and term filters when listing activities', async () => {
+    (
+      prismaService as unknown as { activity: { findMany: jest.Mock } }
+    ).activity.findMany.mockResolvedValueOnce([]);
+    (
+      prismaService as unknown as { activity: { count: jest.Mock } }
+    ).activity.count.mockResolvedValueOnce(0);
+
+    await service.findAllPaginated('user-1', {
+      page: 2,
+      pageSize: 5,
+      category: 'RESEARCH',
+      status: 'PENDING',
+      term: '2024',
+      search: 'IA',
+    });
+
+    expect(
+      (prismaService as unknown as { activity: { findMany: jest.Mock } })
+        .activity.findMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-1',
+          category: 'RESEARCH',
+          status: 'PENDING',
+          term: { startsWith: '2024' },
+          OR: [
+            { title: { contains: 'IA', mode: 'insensitive' } },
+            { description: { contains: 'IA', mode: 'insensitive' } },
+          ],
+        },
+        skip: 5,
+        take: 5,
+      }),
+    );
   });
 
   it('throws NotFoundException when updating an activity that does not belong to the user', async () => {
