@@ -112,7 +112,7 @@ model Activity {
   title              String
   description        String
   category           ActivityCategory
-  workloadHours      Int              @map("workload_hours")
+  workloadHours      Decimal          @db.Decimal(10, 2) @map("workload_hours")
   score              Decimal          @db.Decimal(10, 2)
   term               String?
   kind               String?

@@ -92,7 +92,7 @@ describe('ActivitiesService', () => {
           title: dto.title,
           description: dto.description,
           category: dto.category,
-          workloadHours: dto.workloadHours,
+          workloadHours: expect.any(Prisma.Decimal),
           score: expect.any(Prisma.Decimal),
           term: dto.term,
           kind: dto.kind,

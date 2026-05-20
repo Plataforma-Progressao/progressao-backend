@@ -1,4 +1,4 @@
-import { IsIn, IsInt, Min } from 'class-validator';
+import { IsIn, IsNumber, Min } from 'class-validator';
 import type { ActivityCategoryCode } from './create-activity.dto';
 
 export class EstimateActivityScoreDto {
@@ -7,7 +7,10 @@ export class EstimateActivityScoreDto {
   })
   category!: ActivityCategoryCode;
 
-  @IsInt({ message: 'Carga horaria deve ser um numero inteiro.' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Carga horaria deve ser um numero valido.' },
+  )
   @Min(0, { message: 'Carga horaria deve ser maior ou igual a 0.' })
   workloadHours!: number;
 }

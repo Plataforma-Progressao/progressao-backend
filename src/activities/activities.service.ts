@@ -23,7 +23,7 @@ type ActivityRecord = {
   title: string;
   description: string;
   category: string;
-  workloadHours: number;
+  workloadHours: Prisma.Decimal | number | string;
   score: Prisma.Decimal | number | string;
   term: string | null;
   kind: string | null;
@@ -55,7 +55,7 @@ type ActivityCreateInput = {
   title: string;
   description: string;
   category: string;
-  workloadHours: number;
+  workloadHours: Prisma.Decimal | number;
   score: Prisma.Decimal;
   term: string | null;
   kind: string | null;
@@ -200,7 +200,7 @@ export class ActivitiesService {
         title: dto.title.trim(),
         description: dto.description.trim(),
         category: dto.category,
-        workloadHours: dto.workloadHours,
+        workloadHours: new Prisma.Decimal(dto.workloadHours),
         score: new Prisma.Decimal(dto.score),
         term: dto.term?.trim() || null,
         kind: dto.kind?.trim() || null,
@@ -225,7 +225,10 @@ export class ActivitiesService {
         title: dto.title?.trim(),
         description: dto.description?.trim(),
         category: dto.category,
-        workloadHours: dto.workloadHours,
+        workloadHours:
+          dto.workloadHours === undefined
+            ? undefined
+            : new Prisma.Decimal(dto.workloadHours),
         score:
           dto.score === undefined ? undefined : new Prisma.Decimal(dto.score),
         term: dto.term === undefined ? undefined : dto.term?.trim() || null,
@@ -357,7 +360,7 @@ export class ActivitiesService {
     title: string;
     description: string;
     category: string;
-    workloadHours: number;
+    workloadHours: Prisma.Decimal | number | string;
     score: Prisma.Decimal | number | string;
     status: string;
     term: string | null;
@@ -409,7 +412,7 @@ export class ActivitiesService {
     title: string;
     description: string;
     category: string;
-    workloadHours: number;
+    workloadHours: Prisma.Decimal | number | string;
     score: Prisma.Decimal | number | string;
     status: string;
     term: string | null;
@@ -420,7 +423,7 @@ export class ActivitiesService {
       title: activity.title,
       description: activity.description,
       category: activity.category as ActivityListItemDto['category'],
-      workloadHours: activity.workloadHours,
+      workloadHours: Number(activity.workloadHours),
       score: Number(activity.score),
       status: activity.status as ActivityListItemDto['status'],
       term: activity.term ?? '',

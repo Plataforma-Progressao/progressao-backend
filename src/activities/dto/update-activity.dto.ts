@@ -1,6 +1,5 @@
 import {
   IsIn,
-  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -30,7 +29,10 @@ export class UpdateActivityDto {
   category?: ActivityCategoryCode;
 
   @IsOptional()
-  @IsInt({ message: 'Carga horaria deve ser um numero inteiro.' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Carga horaria deve ser um numero valido.' },
+  )
   @Min(0, { message: 'Carga horaria deve ser maior ou igual a 0.' })
   workloadHours?: number;
 
