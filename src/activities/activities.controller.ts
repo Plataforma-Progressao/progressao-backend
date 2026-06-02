@@ -41,7 +41,7 @@ export class ActivitiesReportController {
   async listActivities(
     @Req() request: AuthenticatedRequest,
   ): Promise<ListActivitiesResponseDto> {
-    return this.activitiesService.getLegacyReport(request.user.sub);
+    return this.activitiesService.getRadReport(request.user.sub);
   }
 }
 

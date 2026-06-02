@@ -78,6 +78,7 @@ type ActivityUpdateInput = Partial<
 
 type ActivityListWhere = {
   userId: string;
+  progressionCycleId?: string;
   category?: string;
   status?: string;
   term?: { startsWith: string };
@@ -135,24 +136,39 @@ export class ActivitiesService {
     return this.prisma as unknown as ActivitiesDatabase;
   }
 
-  async getLegacyReport(userId: string): Promise<ListActivitiesResponseDto> {
+  async getRadReport(userId: string): Promise<ListActivitiesResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        siapeId: true,
+        department: true,
+        workRegime: true,
+        university: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado.');
+    }
+
+    const cycle =
+      (await this.prisma.progressionCycle.findFirst({
+        where: { userId, isActive: true },
+        orderBy: { startsAt: 'desc' },
+      })) ??
+      (await this.prisma.progressionCycle.findFirst({
+        where: { userId },
+        orderBy: { startsAt: 'desc' },
+      }));
+
+    const activities = await this.findActivitiesForReport(userId, cycle?.id ?? null);
+
     return {
-      userData: {
-        id: userId,
-        name: 'Dr. Manuel Rocha',
-        siapeId: '19827364-0',
-        department: 'Ciencias da Computacao',
-        workRegime: 'Dedicacao Exclusiva (DE)',
-      },
-      metadata: {
-        institution: 'UNIVERSIDADE FEDERAL DO CONHECIMENTO',
-        graduateOfficeTitle: 'PRO-REITORIA DE GRADUACAO E PESQUISA',
-        documentLabel: 'DOCUMENTO PRELIMINAR',
-        cycleLabel: 'Ciclo 2023/2024',
-        issuedAtLabel: '24 de maio de 2024',
-        cycleStatus: 'Em conformidade',
-      },
-      activities: this.mockActivities,
+      userData: this.buildReportUserProfile(user),
+      metadata: this.buildReportMetadata(user, cycle, activities),
+      activities: activities.map((activity) => this.toListItem(activity)),
     };
   }
 
@@ -204,8 +220,9 @@ export class ActivitiesService {
         score: new Prisma.Decimal(dto.score),
         term: dto.term?.trim() || null,
         kind: dto.kind?.trim() || null,
-        status: 'PENDING',
+        status: 'APPROVED',
         submittedAt: new Date(),
+        reviewedAt: new Date(),
       },
     });
 
@@ -407,6 +424,152 @@ export class ActivitiesService {
     }
   }
 
+  private async findActivitiesForReport(
+    userId: string,
+    progressionCycleId: string | null,
+  ): Promise<ActivityRecord[]> {
+    if (progressionCycleId) {
+      const cycleActivities = await this.db.activity.findMany({
+        where: { userId, progressionCycleId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (cycleActivities.length > 0) {
+        return cycleActivities;
+      }
+    }
+
+    return this.db.activity.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private buildReportUserProfile(user: {
+    id: string;
+    name: string;
+    siapeId: string | null;
+    department: string | null;
+    workRegime: string | null;
+  }): ListActivitiesResponseDto['userData'] {
+    return {
+      id: user.id,
+      name: user.name.trim(),
+      siapeId: user.siapeId?.trim() || 'N/A',
+      department: user.department?.trim() || 'Departamento nao informado',
+      workRegime: this.formatWorkRegime(user.workRegime),
+    };
+  }
+
+  private buildReportMetadata(
+    user: { university: string | null },
+    cycle: {
+      label: string;
+      startsAt: Date;
+      endsAt: Date;
+      statusLabel: string | null;
+      issuedAtLabel: string | null;
+    } | null,
+    activities: readonly { status: string }[],
+  ): ListActivitiesResponseDto['metadata'] {
+    return {
+      institution: this.formatInstitutionName(user.university),
+      graduateOfficeTitle: 'PRO-REITORIA DE GRADUACAO E PESQUISA',
+      documentLabel: this.resolveDocumentLabel(activities),
+      cycleLabel: cycle ? this.formatCycleLabel(cycle) : 'Ciclo nao informado',
+      issuedAtLabel: cycle?.issuedAtLabel?.trim() || this.formatDateLabel(new Date()),
+      cycleStatus: this.resolveCycleStatus(cycle, activities),
+    };
+  }
+
+  private formatInstitutionName(university: string | null): string {
+    const value = university?.trim();
+    return value && value.length > 0 ? value.toUpperCase() : 'INSTITUICAO NAO INFORMADA';
+  }
+
+  private formatWorkRegime(workRegime: string | null): string {
+    if (!workRegime?.trim()) {
+      return 'Regime nao informado';
+    }
+
+    const normalized = workRegime.trim().toUpperCase();
+    switch (normalized) {
+      case 'DE':
+        return 'Dedicacao Exclusiva (DE)';
+      case 'TC':
+        return 'Tempo Integral (TC)';
+      case 'TP':
+        return 'Tempo Parcial (TP)';
+      default:
+        return workRegime.trim();
+    }
+  }
+
+  private formatCycleLabel(cycle: {
+    label: string;
+    startsAt: Date;
+    endsAt: Date;
+  }): string {
+    const label = cycle.label.trim();
+    if (label.length > 0) {
+      return label;
+    }
+
+    const startYear = cycle.startsAt.getFullYear();
+    const endYear = cycle.endsAt.getFullYear();
+    return `${startYear} - ${endYear}`;
+  }
+
+  private formatDateLabel(date: Date): string {
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private resolveDocumentLabel(
+    activities: readonly { status: string }[],
+  ): string {
+    if (activities.length === 0) {
+      return 'DOCUMENTO PRELIMINAR';
+    }
+
+    const hasPending = activities.some(
+      (activity) => activity.status === 'PENDING' || activity.status === 'DRAFT',
+    );
+
+    return hasPending ? 'DOCUMENTO PRELIMINAR' : 'DOCUMENTO CONSOLIDADO';
+  }
+
+  private resolveCycleStatus(
+    cycle: { statusLabel: string | null } | null,
+    activities: readonly { status: string }[],
+  ): string {
+    const cycleStatus = cycle?.statusLabel?.trim();
+    if (cycleStatus) {
+      return cycleStatus;
+    }
+
+    if (activities.length === 0) {
+      return 'Sem atividades registradas';
+    }
+
+    if (activities.some((activity) => activity.status === 'REJECTED')) {
+      return 'Com pendencias';
+    }
+
+    if (
+      activities.some(
+        (activity) => activity.status === 'PENDING' || activity.status === 'DRAFT',
+      )
+    ) {
+      return 'Em revisao';
+    }
+
+    return 'Em conformidade';
+  }
+
   private toListItem(activity: {
     id: string;
     title: string;
@@ -425,7 +588,7 @@ export class ActivitiesService {
       category: activity.category as ActivityListItemDto['category'],
       workloadHours: Number(activity.workloadHours),
       score: Number(activity.score),
-      status: activity.status as ActivityListItemDto['status'],
+      status: this.normalizeActivityStatus(activity.status),
       term: activity.term ?? '',
       kind: activity.kind ?? '',
     };
@@ -447,94 +610,14 @@ export class ActivitiesService {
     };
   }
 
-  private readonly mockActivities: readonly ActivityListItemDto[] = [
-    {
-      id: 'atv-teaching-1',
-      title: 'Estruturas de Dados II (COMP0342)',
-      description: 'Graduacao — 60 h teoricas / 30 h praticas',
-      category: 'TEACHING',
-      workloadHours: 90,
-      score: 30,
-      status: 'APPROVED',
-      term: '2024.1',
-      kind: 'Disciplina de graduacao',
-    },
-    {
-      id: 'atv-teaching-2',
-      title: 'Topicos avancados em IA (POS504)',
-      description: 'Pos-graduacao — 45 h',
-      category: 'TEACHING',
-      workloadHours: 45,
-      score: 20,
-      status: 'APPROVED',
-      term: '2024.1',
-      kind: 'Disciplina de pos-graduacao',
-    },
-    {
-      id: 'atv-research-1',
-      title: 'Publicacao em periodico A1 — Nature Machine Intelligence',
-      description: 'Artigo principal publicado em 2024',
-      category: 'RESEARCH',
-      workloadHours: 120,
-      score: 45,
-      status: 'APPROVED',
-      term: '2024',
-      kind: 'Publicacao Qualis A1',
-    },
-    {
-      id: 'atv-research-2',
-      title: 'Orientacao de doutorado concluida',
-      description: 'Defesa aprovada no programa de Computacao',
-      category: 'RESEARCH',
-      workloadHours: 80,
-      score: 25,
-      status: 'APPROVED',
-      term: '2024',
-      kind: 'Orientacao',
-    },
-    {
-      id: 'atv-outreach-1',
-      title: 'Projeto de extensao em inclusao digital',
-      description: 'Atuacao em comunidade com cursos de programacao',
-      category: 'OUTREACH',
-      workloadHours: 60,
-      score: 18,
-      status: 'APPROVED',
-      term: '2024',
-      kind: 'Projeto de extensao',
-    },
-    {
-      id: 'atv-management-1',
-      title: 'Coordenacao academica de curso',
-      description: 'Gestao de grade e planejamento academico',
-      category: 'MANAGEMENT',
-      workloadHours: 120,
-      score: 40,
-      status: 'APPROVED',
-      term: '2024',
-      kind: 'Gestao academica',
-    },
-    {
-      id: 'atv-pending-1',
-      title: 'Banca de mestrado',
-      description: 'Participacao em banca aguardando validacao',
-      category: 'RESEARCH',
-      workloadHours: 12,
-      score: 8,
-      status: 'PENDING',
-      term: '2024',
-      kind: 'Banca',
-    },
-    {
-      id: 'atv-rejected-1',
-      title: 'Evento sem comprovacao completa',
-      description: 'Atividade com documentacao insuficiente',
-      category: 'OUTREACH',
-      workloadHours: 10,
-      score: 3,
-      status: 'REJECTED',
-      term: '2024',
-      kind: 'Evento',
-    },
-  ];
+  private normalizeActivityStatus(status: string): ActivityListItemDto['status'] {
+    switch (status) {
+      case 'APPROVED':
+      case 'PENDING':
+      case 'REJECTED':
+        return status;
+      default:
+        return 'PENDING';
+    }
+  }
 }

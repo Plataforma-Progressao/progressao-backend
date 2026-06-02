@@ -116,7 +116,7 @@ model Activity {
   score              Decimal          @db.Decimal(10, 2)
   term               String?
   kind               String?
-  status             ActivityStatus   @default(PENDING)
+  status             ActivityStatus   @default(APPROVED)
   submittedAt        DateTime?        @map("submitted_at")
   reviewedAt         DateTime?        @map("reviewed_at")
   reviewerId         String?          @map("reviewer_id")

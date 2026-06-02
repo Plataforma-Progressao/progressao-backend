@@ -34,6 +34,7 @@ export class UsersService {
     name: string;
     careerClass: string | null;
     currentLevel: string | null;
+    lastProgressionDate: Date | null;
   } | null> {
     return this.prisma.user.findUnique({
       where: { id },
@@ -42,6 +43,7 @@ export class UsersService {
         name: true,
         careerClass: true,
         currentLevel: true,
+        lastProgressionDate: true,
       },
     });
   }
