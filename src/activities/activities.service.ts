@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { existsSync, unlinkSync } from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
+import { ActivityChangeLogListDto } from './dto/activity-change-log.dto';
+import { ActivityDetailDto } from './dto/activity-detail.dto';
+import { ActivityEvidenceDto } from './dto/activity-evidence.dto';
 import {
   ActivityListItemDto,
   ListActivitiesResponseDto,
@@ -15,6 +19,12 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { EstimateActivityScoreDto } from './dto/estimate-activity-score.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { UploadedEvidenceFile } from './types/uploaded-evidence-file';
+import { resolveEvidenceAbsolutePath } from './config/multer-storage';
+import {
+  creationChangeEntry,
+  diffActivityFields,
+  snapshotFromActivity,
+} from './utils/activity-field-audit';
 
 type ActivityRecord = {
   id: string;
@@ -52,6 +62,7 @@ type ActivityEvidenceRecord = {
 
 type ActivityCreateInput = {
   userId: string;
+  progressionCycleId: string | null;
   title: string;
   description: string;
   category: string;
@@ -61,6 +72,7 @@ type ActivityCreateInput = {
   kind: string | null;
   status: string;
   submittedAt: Date;
+  reviewedAt: Date;
 };
 
 type ActivityUpdateInput = Partial<
@@ -128,9 +140,33 @@ interface ActivitiesDatabase {
   };
 }
 
+type ActivityChangeLogDelegate = {
+  findMany(args: unknown): Promise<
+    {
+      id: string;
+      field: string;
+      fieldLabel: string;
+      oldValue: string | null;
+      newValue: string | null;
+      changedAt: Date;
+      changedBy: { name: string } | null;
+    }[]
+  >;
+  create(args: unknown): Promise<unknown>;
+  createMany(args: unknown): Promise<unknown>;
+};
+
+type PrismaWithChangeLog = PrismaService & {
+  activityChangeLog: ActivityChangeLogDelegate;
+};
+
 @Injectable()
 export class ActivitiesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private get prismaClient(): PrismaWithChangeLog {
+    return this.prisma as PrismaWithChangeLog;
+  }
 
   private get db(): ActivitiesDatabase {
     return this.prisma as unknown as ActivitiesDatabase;
@@ -201,18 +237,58 @@ export class ActivitiesService {
     };
   }
 
-  async findById(userId: string, id: string): Promise<ActivityListItemDto> {
+  async findById(userId: string, id: string): Promise<ActivityDetailDto> {
     const activity = await this.findOwnedActivity(userId, id);
-    return this.toListItem(activity);
+    const evidences = await this.prisma.activityEvidence.findMany({
+      where: { activityId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      ...this.toListItem(activity),
+      evidences: evidences.map((evidence) => this.toEvidenceDto(evidence)),
+    };
+  }
+
+  async findChanges(
+    userId: string,
+    activityId: string,
+  ): Promise<ActivityChangeLogListDto> {
+    await this.findOwnedActivity(userId, activityId);
+
+    const rows = await this.prismaClient.activityChangeLog.findMany({
+      where: { activityId },
+      orderBy: { changedAt: 'desc' },
+      include: {
+        changedBy: { select: { name: true } },
+      },
+    });
+
+    return {
+      total: rows.length,
+      items: rows.map((row) => ({
+        id: row.id,
+        field: row.field,
+        fieldLabel: row.fieldLabel,
+        oldValue: row.oldValue,
+        newValue: row.newValue,
+        changedAt: row.changedAt.toISOString(),
+        changedByName: row.changedBy?.name ?? null,
+      })),
+    };
   }
 
   async create(
     userId: string,
     dto: CreateActivityDto,
   ): Promise<ActivityListItemDto> {
+    const activeCycleId = await this.resolveActiveCycleId(userId);
+    const created = creationChangeEntry();
+
     const activity = await this.db.activity.create({
       data: {
         userId,
+        progressionCycleId: activeCycleId,
         title: dto.title.trim(),
         description: dto.description.trim(),
         category: dto.category,
@@ -226,6 +302,17 @@ export class ActivitiesService {
       },
     });
 
+    await this.prismaClient.activityChangeLog.create({
+      data: {
+        activityId: activity.id,
+        field: created.field,
+        fieldLabel: created.fieldLabel,
+        oldValue: created.oldValue,
+        newValue: created.newValue,
+        changedById: userId,
+      },
+    });
+
     return this.toListItem(activity);
   }
 
@@ -234,24 +321,56 @@ export class ActivitiesService {
     id: string,
     dto: UpdateActivityDto,
   ): Promise<ActivityListItemDto> {
-    await this.findOwnedActivity(userId, id);
+    const existing = await this.findOwnedActivity(userId, id);
+    const before = snapshotFromActivity(existing);
+
+    const merged = {
+      title: dto.title?.trim() ?? existing.title,
+      description: dto.description?.trim() ?? existing.description,
+      category: dto.category ?? existing.category,
+      workloadHours:
+        dto.workloadHours === undefined
+          ? Number(existing.workloadHours)
+          : dto.workloadHours,
+      score: dto.score === undefined ? Number(existing.score) : dto.score,
+      term: dto.term === undefined ? existing.term : dto.term?.trim() || null,
+      kind: dto.kind === undefined ? existing.kind : dto.kind?.trim() || null,
+    };
+
+    const after = snapshotFromActivity({
+      ...existing,
+      ...merged,
+      workloadHours: merged.workloadHours,
+      score: merged.score,
+    });
+
+    const changes = diffActivityFields(before, after);
 
     const activity = await this.db.activity.update({
       where: { id },
       data: {
-        title: dto.title?.trim(),
-        description: dto.description?.trim(),
-        category: dto.category,
-        workloadHours:
-          dto.workloadHours === undefined
-            ? undefined
-            : new Prisma.Decimal(dto.workloadHours),
-        score:
-          dto.score === undefined ? undefined : new Prisma.Decimal(dto.score),
-        term: dto.term === undefined ? undefined : dto.term?.trim() || null,
-        kind: dto.kind === undefined ? undefined : dto.kind?.trim() || null,
+        title: merged.title,
+        description: merged.description,
+        category: merged.category,
+        workloadHours: new Prisma.Decimal(merged.workloadHours),
+        score: new Prisma.Decimal(merged.score),
+        term: merged.term,
+        kind: merged.kind,
       },
     });
+
+    if (changes.length > 0) {
+      await this.prismaClient.activityChangeLog.createMany({
+        data: changes.map((change) => ({
+          activityId: id,
+          field: change.field,
+          fieldLabel: change.fieldLabel,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+          changedById: userId,
+        })),
+      });
+    }
 
     return this.toListItem(activity);
   }
@@ -297,21 +416,55 @@ export class ActivitiesService {
     userId: string,
     evidenceId: string,
   ): Promise<{ id: string }> {
-    const evidence = await this.db.activityEvidence.findFirst({
+    const evidence = await this.prisma.activityEvidence.findFirst({
       where: {
         id: evidenceId,
         activity: { userId },
       },
-      select: { id: true },
     });
 
     if (!evidence) {
       throw new NotFoundException('Comprovante nao encontrado.');
     }
 
-    await this.db.activityEvidence.delete({ where: { id: evidenceId } });
+    this.removeEvidenceFile(evidence.storagePath);
+    await this.prisma.activityEvidence.delete({ where: { id: evidenceId } });
 
     return { id: evidenceId };
+  }
+
+  async getEvidenceFile(
+    userId: string,
+    evidenceId: string,
+  ): Promise<{
+    absolutePath: string;
+    originalName: string;
+    mimeType: string;
+  }> {
+    const evidence = await this.prisma.activityEvidence.findFirst({
+      where: {
+        id: evidenceId,
+        activity: { userId },
+      },
+    });
+
+    if (!evidence) {
+      throw new NotFoundException('Comprovante nao encontrado.');
+    }
+
+    const absolutePath = resolveEvidenceAbsolutePath(evidence.storagePath);
+
+    if (!absolutePath || !existsSync(absolutePath)) {
+      throw new NotFoundException(
+        'Arquivo do comprovante indisponivel. Em producao, configure armazenamento em nuvem.',
+      );
+    }
+
+    return {
+      absolutePath,
+      originalName: evidence.originalName ?? evidence.filename ?? 'comprovante',
+      mimeType: evidence.mimeType ?? 'application/octet-stream',
+    };
   }
 
   estimateScore(dto: EstimateActivityScoreDto): {
@@ -591,6 +744,33 @@ export class ActivitiesService {
       status: this.normalizeActivityStatus(activity.status),
       term: activity.term ?? '',
       kind: activity.kind ?? '',
+    };
+  }
+
+  private async resolveActiveCycleId(userId: string): Promise<string | null> {
+    const cycle = await this.prisma.progressionCycle.findFirst({
+      where: { userId, isActive: true },
+      orderBy: { startsAt: 'desc' },
+      select: { id: true },
+    });
+
+    return cycle?.id ?? null;
+  }
+
+  private removeEvidenceFile(storagePath: string | null): void {
+    const absolutePath = resolveEvidenceAbsolutePath(storagePath);
+    if (absolutePath && existsSync(absolutePath)) {
+      unlinkSync(absolutePath);
+    }
+  }
+
+  private toEvidenceDto(evidence: ActivityEvidenceRecord): ActivityEvidenceDto {
+    return {
+      id: evidence.id,
+      originalName: evidence.originalName ?? evidence.filename ?? 'Comprovante',
+      mimeType: evidence.mimeType,
+      sizeBytes: evidence.sizeBytes ?? 0,
+      createdAt: evidence.createdAt.toISOString(),
     };
   }
 

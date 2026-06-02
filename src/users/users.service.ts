@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterUserInput } from '../common/interfaces/register-user-input.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UserOnboardingService } from './user-onboarding.service';
 
 @Injectable()
 export class UsersService {
@@ -27,7 +28,10 @@ export class UsersService {
     updatedAt: true,
   } satisfies Prisma.UserSelect;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userOnboarding: UserOnboardingService,
+  ) {}
 
   async findDashboardProfileById(id: string): Promise<{
     id: string;
@@ -116,24 +120,34 @@ export class UsersService {
     };
 
     try {
-      createdUser = await this.prisma.user.create({
-        data: {
-          email: data.email,
-          name: data.fullName,
-          cpf: data.cpf,
-          university: data.university,
-          center: data.center,
-          department: data.department,
-          practiceAreas: data.practiceAreas,
-          careerClass: data.careerClass,
-          currentLevel: data.currentLevel,
-          lastProgressionDate: data.lastProgressionDate,
-          acceptTerms: data.acceptTerms,
-          acceptLgpd: data.acceptLgpd,
-          passwordHash,
-          role: PrismaRole.USER,
-        },
-        select: this.userPublicSelect,
+      createdUser = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: data.email,
+            name: data.fullName,
+            cpf: data.cpf,
+            university: data.university,
+            center: data.center,
+            department: data.department,
+            practiceAreas: data.practiceAreas,
+            careerClass: data.careerClass,
+            currentLevel: data.currentLevel,
+            lastProgressionDate: data.lastProgressionDate,
+            acceptTerms: data.acceptTerms,
+            acceptLgpd: data.acceptLgpd,
+            passwordHash,
+            role: PrismaRole.USER,
+          },
+          select: this.userPublicSelect,
+        });
+
+        await this.userOnboarding.bootstrapForUser(
+          user.id,
+          data.lastProgressionDate,
+          tx,
+        );
+
+        return user;
       });
     } catch (error: unknown) {
       if (this.isUniqueConstraintError(error)) {
