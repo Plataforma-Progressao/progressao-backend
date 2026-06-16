@@ -24,6 +24,7 @@ import { UserChecklistItemsModule } from './user-checklist-items/user-checklist-
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportSnapshotsModule } from './report-snapshots/report-snapshots.module';
 import { UserScoreSummariesModule } from './user-score-summaries/user-score-summaries.module';
+import { ChecklistModule } from './checklist/checklist.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { UserScoreSummariesModule } from './user-score-summaries/user-score-summ
     NotificationsModule,
     ReportSnapshotsModule,
     UserScoreSummariesModule,
+    ChecklistModule,
   ],
   controllers: [AppController],
   providers: [

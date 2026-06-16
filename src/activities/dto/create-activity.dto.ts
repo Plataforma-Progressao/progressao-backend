@@ -16,12 +16,12 @@ export type ActivityCategoryCode =
 
 export class CreateActivityDto {
   @IsString()
-  @MinLength(8, { message: 'Titulo deve ter pelo menos 8 caracteres.' })
+  @MinLength(4, { message: 'Titulo deve ter pelo menos 4 caracteres.' })
   @MaxLength(160, { message: 'Titulo deve ter no maximo 160 caracteres.' })
   title!: string;
 
   @IsString()
-  @MinLength(10, { message: 'Descricao deve ter pelo menos 10 caracteres.' })
+  @MinLength(4, { message: 'Descricao deve ter pelo menos 4 caracteres.' })
   @MaxLength(1200, { message: 'Descricao deve ter no maximo 1200 caracteres.' })
   description!: string;
 

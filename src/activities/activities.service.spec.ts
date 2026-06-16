@@ -22,9 +22,9 @@ describe('ActivitiesService', () => {
     score: new Prisma.Decimal('15.50'),
     term: '2024.1',
     kind: 'Publicacao',
-    status: 'PENDING',
+    status: 'APPROVED',
     submittedAt: new Date('2026-01-10T10:00:00.000Z'),
-    reviewedAt: null,
+    reviewedAt: new Date('2026-01-10T10:00:00.000Z'),
     reviewerId: null,
     rejectionReason: null,
     createdAt: new Date('2026-01-10T10:00:00.000Z'),
@@ -38,6 +38,12 @@ describe('ActivitiesService', () => {
         {
           provide: PrismaService,
           useValue: {
+            user: {
+              findUnique: jest.fn(),
+            },
+            progressionCycle: {
+              findFirst: jest.fn(),
+            },
             activity: {
               create: jest.fn(),
               findMany: jest.fn(),
@@ -96,6 +102,9 @@ describe('ActivitiesService', () => {
           score: expect.any(Prisma.Decimal),
           term: dto.term,
           kind: dto.kind,
+          status: 'APPROVED',
+          submittedAt: expect.any(Date),
+          reviewedAt: expect.any(Date),
         }),
       }),
     );
@@ -250,5 +259,74 @@ describe('ActivitiesService', () => {
     expect(result.baseCategory).toBe(15);
     expect(result.workloadFactor).toBe(2.5);
     expect(result.totalImpact).toBe(17.5);
+  });
+
+  it('builds the RAD report from user profile, cycle and activities', async () => {
+    const approvedActivity = {
+      ...mockActivity,
+      status: 'APPROVED',
+    };
+
+    (
+      prismaService as unknown as {
+        user: { findUnique: jest.Mock };
+        progressionCycle: { findFirst: jest.Mock };
+      }
+    ).user = {
+      findUnique: jest.fn().mockResolvedValueOnce({
+        id: 'user-1',
+        name: 'Dr. Ana Souza',
+        siapeId: '1234567-8',
+        department: 'Ciencias da Computacao',
+        workRegime: 'DE',
+        university: 'UFMG',
+      }),
+    };
+    (
+      prismaService as unknown as {
+        progressionCycle: { findFirst: jest.Mock };
+      }
+    ).progressionCycle = {
+      findFirst: jest.fn().mockResolvedValueOnce({
+        id: 'cycle-1',
+        label: 'Ciclo 2025/2026',
+        startsAt: new Date('2025-01-01T00:00:00.000Z'),
+        endsAt: new Date('2026-12-31T00:00:00.000Z'),
+        statusLabel: 'Em conformidade',
+        issuedAtLabel: '2 de junho de 2026',
+      }),
+    };
+    (
+      prismaService as unknown as { activity: { findMany: jest.Mock } }
+    ).activity.findMany.mockResolvedValueOnce([approvedActivity]);
+
+    const result = await service.getRadReport('user-1');
+
+    expect(result.userData).toEqual({
+      id: 'user-1',
+      name: 'Dr. Ana Souza',
+      siapeId: '1234567-8',
+      department: 'Ciencias da Computacao',
+      workRegime: 'Dedicacao Exclusiva (DE)',
+    });
+    expect(result.metadata.institution).toBe('UFMG');
+    expect(result.metadata.cycleLabel).toBe('Ciclo 2025/2026');
+    expect(result.metadata.documentLabel).toBe('DOCUMENTO CONSOLIDADO');
+    expect(result.activities).toHaveLength(1);
+    expect(result.activities[0]?.status).toBe('APPROVED');
+  });
+
+  it('throws NotFoundException when building RAD report for missing user', async () => {
+    (
+      prismaService as unknown as {
+        user: { findUnique: jest.Mock };
+      }
+    ).user = {
+      findUnique: jest.fn().mockResolvedValueOnce(null),
+    };
+
+    await expect(service.getRadReport('missing-user')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

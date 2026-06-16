@@ -925,6 +925,20 @@ npm run prisma:studio
 # DELETE FROM users;
 ```
 
+## Armazenamento de comprovantes (produção)
+
+Em desenvolvimento local, comprovantes de atividades são gravados em `uploads/` no disco (pasta ignorada pelo Git). Em **Vercel** (ou outro runtime serverless), o filesystem é **efêmero** — arquivos somem entre invocações. Para produção, use **object storage** compatível com S3.
+
+Opções com tier gratuito adequadas a projetos acadêmicos:
+
+| Serviço | Observação |
+| ------- | ---------- |
+| [Cloudflare R2](https://developers.cloudflare.com/r2/) | Free tier generoso; API compatível com S3 |
+| [Supabase Storage](https://supabase.com/docs/guides/storage) | Integra bem se o banco já é Supabase/Postgres |
+| [Backblaze B2](https://www.backblaze.com/b2/cloud-storage.html) | Baixo custo; egress gratuito via Cloudflare |
+
+A integração cloud não está implementada neste repositório; a API persiste metadados (`ActivityEvidence`) e, em dev, o caminho local em `storagePath`. O front desabilita upload no checklist até o storage estar configurado.
+
 ## 📞 Suporte
 
 Para reportar bugs ou sugerir features, abra uma issue no repositório.

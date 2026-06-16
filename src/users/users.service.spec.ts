@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
+import { UserOnboardingService } from './user-onboarding.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '../common/enums/role.enum';
 import { PublicUser } from '../common/types/public-user.type';
@@ -75,6 +76,12 @@ describe('UsersService', () => {
               findUnique: jest.fn(),
               findMany: jest.fn(),
             },
+          },
+        },
+        {
+          provide: UserOnboardingService,
+          useValue: {
+            bootstrapForUser: jest.fn(),
           },
         },
       ],

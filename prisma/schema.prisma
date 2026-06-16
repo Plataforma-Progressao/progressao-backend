@@ -78,6 +78,7 @@ model User {
   reviewedActivities Activity[]             @relation("ActivityReviewer")
   uploadedEvidences  ActivityEvidence[]     @relation("EvidenceUploader")
   statusChanges      ActivityStatusHistory[] @relation("StatusChangedBy")
+  activityChangeLogs ActivityChangeLog[]     @relation("ActivityChangedBy")
   reviewedChecklistItems UserChecklistItem[] @relation("ChecklistReviewer")
 
   @@map("users")
@@ -116,7 +117,7 @@ model Activity {
   score              Decimal          @db.Decimal(10, 2)
   term               String?
   kind               String?
-  status             ActivityStatus   @default(PENDING)
+  status             ActivityStatus   @default(APPROVED)
   submittedAt        DateTime?        @map("submitted_at")
   reviewedAt         DateTime?        @map("reviewed_at")
   reviewerId         String?          @map("reviewer_id")
@@ -129,6 +130,7 @@ model Activity {
   reviewer         User?                 @relation("ActivityReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   evidences        ActivityEvidence[]
   statusHistory    ActivityStatusHistory[]
+  changeLogs       ActivityChangeLog[]
 
   @@index([userId, status], map: "idx_activity_user_status")
   @@index([progressionCycleId], map: "idx_activity_cycle")
@@ -171,6 +173,23 @@ model ActivityStatusHistory {
 
   @@index([activityId, changedAt], map: "idx_activity_status_history")
   @@map("activity_status_history")
+}
+
+model ActivityChangeLog {
+  id          String   @id @default(uuid())
+  activityId  String   @map("activity_id")
+  field       String
+  fieldLabel  String   @map("field_label")
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+  changedById String?  @map("changed_by_id")
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  activity  Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  changedBy User?    @relation("ActivityChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([activityId, changedAt], map: "idx_activity_change_log")
+  @@map("activity_change_logs")
 }
 
 model ChecklistTemplateItem {

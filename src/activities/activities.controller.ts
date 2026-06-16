@@ -10,14 +10,18 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Request } from 'express';
+import { Request, type Response } from 'express';
+import { createReadStream } from 'fs';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
+import { ActivityChangeLogListDto } from './dto/activity-change-log.dto';
+import { ActivityDetailDto } from './dto/activity-detail.dto';
 import {
   ListActivitiesResponseDto,
   ActivityListItemDto,
@@ -41,7 +45,7 @@ export class ActivitiesReportController {
   async listActivities(
     @Req() request: AuthenticatedRequest,
   ): Promise<ListActivitiesResponseDto> {
-    return this.activitiesService.getLegacyReport(request.user.sub);
+    return this.activitiesService.getRadReport(request.user.sub);
   }
 }
 
@@ -59,11 +63,57 @@ export class ActivitiesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('estimate')
+  async estimateScore(@Body() dto: EstimateActivityScoreDto) {
+    return this.activitiesService.estimateScore(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('evidences/:evidenceId/file')
+  async downloadEvidence(
+    @Req() request: AuthenticatedRequest,
+    @Param('evidenceId') evidenceId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const file = await this.activitiesService.getEvidenceFile(
+      request.user.sub,
+      evidenceId,
+    );
+
+    response.setHeader('Content-Type', file.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(file.originalName)}"`,
+    );
+
+    createReadStream(file.absolutePath).pipe(response);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('evidences/:evidenceId')
+  @HttpCode(HttpStatus.OK)
+  async deleteEvidence(
+    @Req() request: AuthenticatedRequest,
+    @Param('evidenceId') evidenceId: string,
+  ): Promise<{ id: string }> {
+    return this.activitiesService.deleteEvidence(request.user.sub, evidenceId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/changes')
+  async findChanges(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<ActivityChangeLogListDto> {
+    return this.activitiesService.findChanges(request.user.sub, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findById(
     @Req() request: AuthenticatedRequest,
     @Param('id') id: string,
-  ): Promise<ActivityListItemDto> {
+  ): Promise<ActivityDetailDto> {
     return this.activitiesService.findById(request.user.sub, id);
   }
 
@@ -109,21 +159,5 @@ export class ActivitiesController {
       activityId,
       file,
     );
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Delete('evidences/:evidenceId')
-  @HttpCode(HttpStatus.OK)
-  async deleteEvidence(
-    @Req() request: AuthenticatedRequest,
-    @Param('evidenceId') evidenceId: string,
-  ): Promise<{ id: string }> {
-    return this.activitiesService.deleteEvidence(request.user.sub, evidenceId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('estimate')
-  async estimateScore(@Body() dto: EstimateActivityScoreDto) {
-    return this.activitiesService.estimateScore(dto);
   }
 }
