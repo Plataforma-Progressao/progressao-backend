@@ -25,6 +25,8 @@ export class UsersService {
     orcid: true,
     createdAt: true,
     updatedAt: true,
+    careerClass: true,
+    currentLevel: true,
   } satisfies Prisma.UserSelect;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -66,6 +68,8 @@ export class UsersService {
       orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
+      careerClass: string | null;  
+      currentLevel: string | null;
     };
 
     try {
@@ -111,6 +115,8 @@ export class UsersService {
       orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
+      careerClass: string | null; 
+      currentLevel: string | null;
     };
 
     try {
@@ -339,6 +345,8 @@ export class UsersService {
     orcid: string | null;
     createdAt: Date;
     updatedAt: Date;
+    careerClass: string | null;
+    currentLevel: string | null;
   }): PublicUser {
     return {
       id: user.id,
@@ -349,6 +357,8 @@ export class UsersService {
       orcid: user.orcid,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      careerClass: user.careerClass,
+      currentLevel: user.currentLevel,
     };
   }
 

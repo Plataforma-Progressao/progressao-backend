@@ -112,6 +112,8 @@ export class AuthService {
       orcid: user.orcid ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      careerClass: user.careerClass,
+      currentLevel: user.currentLevel,
     };
 
     const tokenPair = await this.issueTokenPair(publicUser);
