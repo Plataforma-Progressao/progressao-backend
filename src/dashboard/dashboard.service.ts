@@ -16,6 +16,9 @@ export class DashboardService {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
+    const rawLevel = user.currentLevel?.trim().toUpperCase() || 'I';
+    const romanMap: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV' };
+    const currentLevel = romanMap[rawLevel] || rawLevel;
 
     return this.dashboardAggregationService.buildHome(user);
   }

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+/// <reference types="jest" />
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -38,6 +39,8 @@ describe('UsersService', () => {
     role: Role.USER,
     createdAt: new Date(),
     updatedAt: new Date(),
+    siapeId: null, 
+    workRegime: null,
     ...overrides,
   });
 
@@ -56,6 +59,8 @@ describe('UsersService', () => {
     orcid: mockPublicUser.orcid ?? null,
     createdAt: mockPublicUser.createdAt,
     updatedAt: mockPublicUser.updatedAt,
+    careerClass: mockPublicUser.careerClass ?? null,  
+    currentLevel: mockPublicUser.currentLevel ?? null,
     ...overrides,
   });
 
@@ -215,16 +220,21 @@ describe('UsersService', () => {
 
   describe('findAll', () => {
     it('should return all users ordered by createdAt descending, no passwordHash', async () => {
-      const mockUsers = [
+      const dbUsers = [
+        createMockUser({ id: 'uuid-1' }),
+        createMockUser({ id: 'uuid-2' }),
+      ];
+
+      const expectedUsers = [
         expectedPublicUser({ id: 'uuid-1' }),
         expectedPublicUser({ id: 'uuid-2' }),
       ];
 
-      jest.spyOn(prismaService.user, 'findMany').mockResolvedValue(mockUsers);
+      jest.spyOn(prismaService.user, 'findMany').mockResolvedValue(dbUsers);
 
       const result = await usersService.findAll();
 
-      expect(result).toEqual(mockUsers);
+      expect(result).toEqual(expectedUsers);
       expect(result).toHaveLength(2);
       result.forEach((user) => {
         expect(user).not.toHaveProperty('passwordHash');

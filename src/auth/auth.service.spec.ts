@@ -31,6 +31,8 @@ describe('AuthService', () => {
     orcid: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    careerClass: null,
+    currentLevel: null,
   };
 
   const mockUserWithPassword = {

@@ -9,4 +9,6 @@ export interface PublicUser {
   orcid: string | null;
   createdAt: Date;
   updatedAt: Date;
+  careerClass: string | null;
+  currentLevel: string | null;
 }

@@ -76,11 +76,26 @@ export class DashboardAggregationService {
 
     const notifications = await this.buildNotifications(user.id);
 
-    const currentLevel = user.currentLevel?.trim().toUpperCase() || 'IV';
+    const rawLevel = user.currentLevel?.trim().toUpperCase() || 'I';
+    const romanMap: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV' };
+    const currentLevel = romanMap[rawLevel] || rawLevel;
     const normalizedCareerClass = normalizeCareerClass(user.careerClass);
     const currentLevelLabel = `${normalizedCareerClass} ${currentLevel}`;
-    const nextLevelLabel =
-      normalizedCareerClass === 'Titular' ? 'Titular II' : 'Titular I';
+    const careerClasses = ['Auxiliar', 'Assistente', 'Adjunto', 'Associado', 'Titular'];
+    const careerLevels = ['I', 'II', 'III', 'IV'];
+    const classIdx = careerClasses.indexOf(normalizedCareerClass);
+    const levelIdx = careerLevels.indexOf(currentLevel);
+    let nextLevelLabel = '';
+
+    if (classIdx === -1 || levelIdx === -1) {
+      nextLevelLabel = 'Em processamento';
+    } else if (levelIdx < careerLevels.length - 1) {
+      nextLevelLabel = `${normalizedCareerClass} ${careerLevels[levelIdx + 1]}`;
+    } else if (classIdx < careerClasses.length - 1) {
+      nextLevelLabel = `${careerClasses[classIdx + 1]} I`;
+    } else {
+      nextLevelLabel = 'Titular (Máximo)';
+    }
 
     return {
       displayName: user.name,
