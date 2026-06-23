@@ -2,6 +2,11 @@
 
 Backend modular de uma plataforma para gestão, organização e geração automatizada do Relatório de Atividades Docentes (RAD) com foco em processos de progressão funcional em universidades federais.
 
+## Documentação do projeto
+
+- [Planejamento Inicial](./PLANEJAMENTO-INICIAL.md) — visão do produto, problema, objetivos e escopo do MVP.
+- [Funcionalidades do Sistema](./FUNCIONALIDADES.md) — catálogo atualizado das funcionalidades implementadas e previstas.
+
 ## 🎯 Visão Geral
 
 Este é o servidor NestJS que fornece APIs REST para:
