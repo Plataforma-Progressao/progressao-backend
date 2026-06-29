@@ -21,13 +21,15 @@ export class UsersService {
     id: true,
     email: true,
     name: true,
-    role: true,
+    roles: true,
     lattesUrl: true,
     orcid: true,
     createdAt: true,
     updatedAt: true,
     careerClass: true,
     currentLevel: true,
+    university: true,
+    department: true,
   } satisfies Prisma.UserSelect;
 
   constructor(
@@ -69,12 +71,12 @@ export class UsersService {
       id: string;
       email: string;
       name: string;
-      role: PrismaRole;
+      roles: PrismaRole[];
       lattesUrl: string | null;
       orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
-      careerClass: string | null;  
+      careerClass: string | null;
       currentLevel: string | null;
     };
 
@@ -84,7 +86,7 @@ export class UsersService {
           email: createUserDto.email,
           name: createUserDto.name,
           passwordHash,
-          role: PrismaRole.USER,
+          roles: [PrismaRole.USER],
         },
         select: this.userPublicSelect,
       });
@@ -116,12 +118,12 @@ export class UsersService {
       id: string;
       email: string;
       name: string;
-      role: PrismaRole;
+      roles: PrismaRole[];
       lattesUrl: string | null;
       orcid: string | null;
       createdAt: Date;
       updatedAt: Date;
-      careerClass: string | null; 
+      careerClass: string | null;
       currentLevel: string | null;
     };
 
@@ -142,7 +144,7 @@ export class UsersService {
             acceptTerms: data.acceptTerms,
             acceptLgpd: data.acceptLgpd,
             passwordHash,
-            role: PrismaRole.USER,
+            roles: [PrismaRole.USER],
           },
           select: this.userPublicSelect,
         });
@@ -356,25 +358,29 @@ export class UsersService {
     id: string;
     email: string;
     name: string;
-    role: PrismaRole;
+    roles: PrismaRole[];
     lattesUrl: string | null;
     orcid: string | null;
     createdAt: Date;
     updatedAt: Date;
     careerClass: string | null;
     currentLevel: string | null;
+    university?: string | null;
+    department?: string | null;
   }): PublicUser {
     return {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as Role,
+      roles: user.roles as Role[],
       lattesUrl: user.lattesUrl,
       orcid: user.orcid,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       careerClass: user.careerClass,
       currentLevel: user.currentLevel,
+      university: user.university ?? null,
+      department: user.department ?? null,
     };
   }
 

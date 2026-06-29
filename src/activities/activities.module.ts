@@ -15,5 +15,6 @@ import { activityEvidenceStorage } from './config/multer-storage';
   ],
   controllers: [ActivitiesReportController, ActivitiesController],
   providers: [ActivitiesService],
+  exports: [ActivitiesService],
 })
 export class ActivitiesModule {}

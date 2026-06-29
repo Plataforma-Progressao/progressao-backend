@@ -37,7 +37,7 @@ A plataforma está organizada em áreas funcionais acessíveis após autenticaç
 | Renovação automática de sessão | **Implementado** | Interceptor de refresh no front-end |
 | Logout | **Implementado** | Invalidação do refresh token no back-end |
 | Recuperação de senha | **Implementado** | Solicitação por e-mail e redefinição com token |
-| Controle de acesso por papéis (RBAC) | **Implementado** | Papéis `USER` e `ADMIN` com guards no back-end |
+| Controle de acesso por papéis (RBAC) | **Implementado** | Papéis `USER`, `EVALUATOR` e `ADMIN` com suporte a múltiplos papéis |
 | Proteção de rotas autenticadas | **Implementado** | Guards no front-end para áreas públicas e autenticadas |
 | Rate limiting | **Implementado** | Throttling global na API |
 

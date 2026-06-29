@@ -11,6 +11,8 @@ export interface ActivityListItemDto {
   readonly status: ActivityStatus;
   readonly term: string;
   readonly kind: string;
+  readonly rejectionReason?: string | null;
+  readonly submittedAt?: string | null;
 }
 
 export interface ReportTeacherProfileDto {

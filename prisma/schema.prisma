@@ -9,6 +9,7 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  EVALUATOR
 }
 
 enum ActivityCategory {
@@ -65,7 +66,7 @@ model User {
   refreshTokenHash       String?   @map("refresh_token_hash")
   resetPasswordTokenHash String?   @map("reset_password_token_hash")
   resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
-  role                   Role      @default(USER)
+  roles                  Role[]    @default([USER])
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
@@ -117,7 +118,7 @@ model Activity {
   score              Decimal          @db.Decimal(10, 2)
   term               String?
   kind               String?
-  status             ActivityStatus   @default(APPROVED)
+  status             ActivityStatus   @default(PENDING)
   submittedAt        DateTime?        @map("submitted_at")
   reviewedAt         DateTime?        @map("reviewed_at")
   reviewerId         String?          @map("reviewer_id")

@@ -107,7 +107,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as Role,
+      roles: user.roles as Role[],
       lattesUrl: user.lattesUrl ?? null,
       orcid: user.orcid ?? null,
       createdAt: user.createdAt,
@@ -231,7 +231,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      roles: user.roles,
     };
 
     return this.jwtService.signAsync(payload, {
@@ -244,7 +244,7 @@ export class AuthService {
     const payload: JwtRefreshPayload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      roles: user.roles,
       type: 'refresh',
     };
 

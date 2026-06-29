@@ -285,7 +285,7 @@ export class ActivitiesService {
     const activeCycleId = await this.resolveActiveCycleId(userId);
     const created = creationChangeEntry();
 
-    const activity = await this.db.activity.create({
+    const activity = await this.prisma.activity.create({
       data: {
         userId,
         progressionCycleId: activeCycleId,
@@ -296,9 +296,21 @@ export class ActivitiesService {
         score: new Prisma.Decimal(dto.score),
         term: dto.term?.trim() || null,
         kind: dto.kind?.trim() || null,
-        status: 'APPROVED',
+        status: 'PENDING',
         submittedAt: new Date(),
-        reviewedAt: new Date(),
+        reviewedAt: null,
+        reviewerId: null,
+        rejectionReason: null,
+      },
+    });
+
+    await this.prisma.activityStatusHistory.create({
+      data: {
+        activityId: activity.id,
+        fromStatus: 'DRAFT',
+        toStatus: 'PENDING',
+        note: 'Atividade enviada para avaliacao.',
+        changedById: userId,
       },
     });
 
@@ -321,7 +333,14 @@ export class ActivitiesService {
     id: string,
     dto: UpdateActivityDto,
   ): Promise<ActivityListItemDto> {
-    const existing = await this.findOwnedActivity(userId, id);
+    const existing = await this.prisma.activity.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Atividade nao encontrada.');
+    }
+
     const before = snapshotFromActivity(existing);
 
     const merged = {
@@ -345,19 +364,44 @@ export class ActivitiesService {
     });
 
     const changes = diffActivityFields(before, after);
+    const needsReReview =
+      changes.length > 0 &&
+      (existing.status === 'APPROVED' || existing.status === 'REJECTED');
 
-    const activity = await this.db.activity.update({
+    const updateData: Prisma.ActivityUpdateInput = {
+      title: merged.title,
+      description: merged.description,
+      category: merged.category,
+      workloadHours: new Prisma.Decimal(merged.workloadHours),
+      score: new Prisma.Decimal(merged.score),
+      term: merged.term,
+      kind: merged.kind,
+    };
+
+    if (needsReReview) {
+      updateData.status = 'PENDING';
+      updateData.submittedAt = new Date();
+      updateData.reviewedAt = null;
+      updateData.reviewer = { disconnect: true };
+      updateData.rejectionReason = null;
+    }
+
+    const activity = await this.prisma.activity.update({
       where: { id },
-      data: {
-        title: merged.title,
-        description: merged.description,
-        category: merged.category,
-        workloadHours: new Prisma.Decimal(merged.workloadHours),
-        score: new Prisma.Decimal(merged.score),
-        term: merged.term,
-        kind: merged.kind,
-      },
+      data: updateData,
     });
+
+    if (needsReReview) {
+      await this.prisma.activityStatusHistory.create({
+        data: {
+          activityId: id,
+          fromStatus: existing.status as 'APPROVED' | 'REJECTED',
+          toStatus: 'PENDING',
+          note: 'Atividade reenviada para avaliacao apos edicao.',
+          changedById: userId,
+        },
+      });
+    }
 
     if (changes.length > 0) {
       await this.prismaClient.activityChangeLog.createMany({
@@ -436,6 +480,7 @@ export class ActivitiesService {
   async getEvidenceFile(
     userId: string,
     evidenceId: string,
+    options?: { allowEvaluatorAccess?: boolean },
   ): Promise<{
     absolutePath: string;
     originalName: string;
@@ -444,11 +489,22 @@ export class ActivitiesService {
     const evidence = await this.prisma.activityEvidence.findFirst({
       where: {
         id: evidenceId,
-        activity: { userId },
+        ...(options?.allowEvaluatorAccess
+          ? {}
+          : { activity: { userId } }),
+      },
+      include: {
+        activity: { select: { userId: true, status: true } },
       },
     });
 
     if (!evidence) {
+      throw new NotFoundException('Comprovante nao encontrado.');
+    }
+
+    if (options?.allowEvaluatorAccess && evidence.activity.userId !== userId) {
+      // Evaluator access is validated at controller level
+    } else if (!options?.allowEvaluatorAccess && evidence.activity.userId !== userId) {
       throw new NotFoundException('Comprovante nao encontrado.');
     }
 
@@ -733,6 +789,8 @@ export class ActivitiesService {
     status: string;
     term: string | null;
     kind: string | null;
+    rejectionReason?: string | null;
+    submittedAt?: Date | null;
   }): ActivityListItemDto {
     return {
       id: activity.id,
@@ -744,6 +802,8 @@ export class ActivitiesService {
       status: this.normalizeActivityStatus(activity.status),
       term: activity.term ?? '',
       kind: activity.kind ?? '',
+      rejectionReason: activity.rejectionReason ?? null,
+      submittedAt: activity.submittedAt?.toISOString() ?? null,
     };
   }
 

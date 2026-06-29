@@ -30,7 +30,8 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Usuario nao autenticado.');
     }
 
-    const hasRole = requiredRoles.includes(request.user.role);
+    const userRoles = request.user.roles ?? [];
+    const hasRole = requiredRoles.some((role) => userRoles.includes(role));
 
     if (!hasRole) {
       throw new ForbiddenException(
