@@ -176,8 +176,21 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 | Funcionalidade | Status | Descrição |
 | -------------- | ------ | --------- |
 | Usuário administrador (seed) | **Implementado** | Criado via variáveis de ambiente e `prisma:seed` |
-| Listagem de usuários (admin) | **Implementado** | Endpoint `GET /users` restrito a `ADMIN` |
-| Painel administrativo no front-end | **Planejado** | Sem interface dedicada para gestão de usuários e templates |
+| Dashboard administrativo | **Implementado** | `GET /api/admin/dashboard/home` e `/admin` no front-end |
+| Listagem e gestão de usuários | **Implementado** | `GET/POST/PATCH /api/admin/users` e `/admin/usuarios` |
+| Atribuição revisor-docente | **Implementado** | `GET/PUT/DELETE /api/admin/evaluator-assignments` e `/admin/atribuicoes` |
+| Alerta de docentes sem revisor | **Implementado** | KPIs no dashboard admin (atividades órfãs fora da fila) |
+
+---
+
+## 12.1 Avaliador funcional
+
+| Funcionalidade | Status | Descrição |
+| -------------- | ------ | --------- |
+| Dashboard do revisor | **Implementado** | `GET /api/evaluator/dashboard/home` e `/avaliador` |
+| Fila de avaliação | **Implementado** | `/avaliador/fila` — somente docentes atribuídos |
+| Aprovar/rejeitar atividades | **Implementado** | Com bloqueio de auto-avaliação |
+| Filtro por atribuição | **Implementado** | Revisor vê apenas docentes vinculados pelo admin |
 
 ---
 

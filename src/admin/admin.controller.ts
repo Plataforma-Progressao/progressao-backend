@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -18,12 +20,22 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { PublicUser } from '../common/types/public-user.type';
+import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminService } from './admin.service';
+import { AdminDashboardHomeDto } from './dto/admin-dashboard-home.dto';
 import { AdminUserListItemDto } from './dto/admin-user-list-item.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { PaginatedAdminUsersResponseDto } from './dto/paginated-admin-users-response.dto';
 import { UpdateAdminUserRolesDto } from './dto/update-admin-user-roles.dto';
+import {
+  AssignEvaluatorDto,
+  ListEvaluatorAssignmentsQueryDto,
+} from './dto/evaluator-assignment.dto';
+import {
+  EvaluatorAssignmentListItemDto,
+  PaginatedEvaluatorAssignmentsResponseDto,
+} from './dto/evaluator-assignment-response.dto';
 
 type AuthenticatedRequest = Request & { user: JwtPayload };
 
@@ -31,7 +43,45 @@ type AuthenticatedRequest = Request & { user: JwtPayload };
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly adminDashboardService: AdminDashboardService,
+  ) {}
+
+  @Get('dashboard/home')
+  async getDashboardHome(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<AdminDashboardHomeDto> {
+    return this.adminDashboardService.getHome(request.user.sub);
+  }
+
+  @Get('evaluator-assignments')
+  async findAllAssignments(
+    @Query() query: ListEvaluatorAssignmentsQueryDto,
+  ): Promise<PaginatedEvaluatorAssignmentsResponseDto> {
+    return this.adminService.findAllAssignmentsPaginated(query);
+  }
+
+  @Put('evaluator-assignments/:teacherId')
+  async assignEvaluator(
+    @Req() request: AuthenticatedRequest,
+    @Param('teacherId') teacherId: string,
+    @Body() dto: AssignEvaluatorDto,
+  ): Promise<EvaluatorAssignmentListItemDto> {
+    return this.adminService.assignEvaluator(
+      request.user.sub,
+      teacherId,
+      dto,
+    );
+  }
+
+  @Delete('evaluator-assignments/:teacherId')
+  @HttpCode(HttpStatus.OK)
+  async unassignEvaluator(
+    @Param('teacherId') teacherId: string,
+  ): Promise<EvaluatorAssignmentListItemDto> {
+    return this.adminService.unassignEvaluator(teacherId);
+  }
 
   @Get('users')
   async findAll(

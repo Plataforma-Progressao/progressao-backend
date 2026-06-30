@@ -16,6 +16,14 @@ import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { PaginatedAdminUsersResponseDto } from './dto/paginated-admin-users-response.dto';
 import { UpdateAdminUserRolesDto } from './dto/update-admin-user-roles.dto';
+import {
+  AssignEvaluatorDto,
+  ListEvaluatorAssignmentsQueryDto,
+} from './dto/evaluator-assignment.dto';
+import {
+  EvaluatorAssignmentListItemDto,
+  PaginatedEvaluatorAssignmentsResponseDto,
+} from './dto/evaluator-assignment-response.dto';
 
 @Injectable()
 export class AdminService {
@@ -196,6 +204,227 @@ export class AdminService {
     });
 
     return this.toListItem(updated);
+  }
+
+  async findAllAssignmentsPaginated(
+    query: ListEvaluatorAssignmentsQueryDto,
+  ): Promise<PaginatedEvaluatorAssignmentsResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    if (query.unassignedOnly) {
+      return this.findUnassignedTeachersPaginated(page, pageSize, query.search);
+    }
+
+    const where: Prisma.UserWhereInput = {
+      roles: { has: PrismaRole.USER },
+    };
+
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.evaluatorId) {
+      where.evaluatorAssignment = { evaluatorId: query.evaluatorId };
+    }
+
+    const [teachers, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          department: true,
+          evaluatorAssignment: {
+            include: {
+              evaluator: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: teachers.map((teacher) => this.toAssignmentListItem(teacher)),
+      total,
+      page,
+      pageSize,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
+    };
+  }
+
+  async assignEvaluator(
+    adminId: string,
+    teacherId: string,
+    dto: AssignEvaluatorDto,
+  ): Promise<EvaluatorAssignmentListItemDto> {
+    if (teacherId === dto.evaluatorId) {
+      throw new BadRequestException(
+        'Um revisor nao pode ser atribuido as proprias atividades.',
+      );
+    }
+
+    const teacher = await this.prisma.user.findUnique({
+      where: { id: teacherId },
+    });
+
+    if (!teacher || !teacher.roles.includes(PrismaRole.USER)) {
+      throw new NotFoundException('Docente nao encontrado.');
+    }
+
+    const evaluator = await this.prisma.user.findUnique({
+      where: { id: dto.evaluatorId },
+    });
+
+    if (!evaluator || !evaluator.roles.includes(PrismaRole.EVALUATOR)) {
+      throw new NotFoundException('Revisor nao encontrado.');
+    }
+
+    const assignment = await this.prisma.evaluatorAssignment.upsert({
+      where: { teacherId },
+      update: {
+        evaluatorId: dto.evaluatorId,
+        assignedById: adminId,
+      },
+      create: {
+        teacherId,
+        evaluatorId: dto.evaluatorId,
+        assignedById: adminId,
+      },
+      include: {
+        teacher: { select: { id: true, name: true, email: true, department: true } },
+        evaluator: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    return this.toAssignmentListItem({
+      id: assignment.teacher.id,
+      name: assignment.teacher.name,
+      email: assignment.teacher.email,
+      department: assignment.teacher.department,
+      evaluatorAssignment: {
+        updatedAt: assignment.updatedAt,
+        evaluator: assignment.evaluator,
+      },
+    });
+  }
+
+  async unassignEvaluator(teacherId: string): Promise<EvaluatorAssignmentListItemDto> {
+    const teacher = await this.prisma.user.findUnique({
+      where: { id: teacherId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        department: true,
+        roles: true,
+        evaluatorAssignment: {
+          include: {
+            evaluator: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!teacher || !teacher.roles.includes(PrismaRole.USER)) {
+      throw new NotFoundException('Docente nao encontrado.');
+    }
+
+    if (teacher.evaluatorAssignment) {
+      await this.prisma.evaluatorAssignment.delete({
+        where: { teacherId },
+      });
+    }
+
+    return this.toAssignmentListItem({
+      id: teacher.id,
+      name: teacher.name,
+      email: teacher.email,
+      department: teacher.department,
+      evaluatorAssignment: null,
+    });
+  }
+
+  private async findUnassignedTeachersPaginated(
+    page: number,
+    pageSize: number,
+    search?: string,
+  ): Promise<PaginatedEvaluatorAssignmentsResponseDto> {
+    const where: Prisma.UserWhereInput = {
+      roles: { has: PrismaRole.USER },
+      evaluatorAssignment: null,
+    };
+
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      where.OR = [
+        { name: { contains: trimmedSearch, mode: 'insensitive' } },
+        { email: { contains: trimmedSearch, mode: 'insensitive' } },
+      ];
+    }
+
+    const [teachers, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          department: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: teachers.map((teacher) =>
+        this.toAssignmentListItem({ ...teacher, evaluatorAssignment: null }),
+      ),
+      total,
+      page,
+      pageSize,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
+    };
+  }
+
+  private toAssignmentListItem(teacher: {
+    id: string;
+    name: string;
+    email: string;
+    department: string | null;
+    evaluatorAssignment?: {
+      updatedAt?: Date;
+      evaluator: { id: string; name: string; email: string };
+    } | null;
+  }): EvaluatorAssignmentListItemDto {
+    return {
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        department: teacher.department,
+      },
+      evaluator: teacher.evaluatorAssignment?.evaluator
+        ? {
+            id: teacher.evaluatorAssignment.evaluator.id,
+            name: teacher.evaluatorAssignment.evaluator.name,
+            email: teacher.evaluatorAssignment.evaluator.email,
+          }
+        : null,
+      assignedAt: teacher.evaluatorAssignment?.updatedAt?.toISOString() ?? null,
+    };
   }
 
   private buildWhere(query: ListAdminUsersQueryDto): Prisma.UserWhereInput {

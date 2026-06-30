@@ -20,6 +20,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { ActivityDetailDto } from '../activities/dto/activity-detail.dto';
 import { EvaluatorService } from './evaluator.service';
+import { EvaluatorDashboardService } from './evaluator-dashboard.service';
+import { EvaluatorDashboardHomeDto } from './dto/evaluator-dashboard-home.dto';
 import { ListEvaluatorActivitiesQueryDto } from './dto/list-evaluator-activities-query.dto';
 import { PaginatedEvaluatorActivitiesResponseDto } from './dto/paginated-evaluator-activities-response.dto';
 import { RejectActivityDto } from './dto/reject-activity.dto';
@@ -31,13 +33,24 @@ type AuthenticatedRequest = Request & { user: JwtPayload };
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.EVALUATOR)
 export class EvaluatorController {
-  constructor(private readonly evaluatorService: EvaluatorService) {}
+  constructor(
+    private readonly evaluatorService: EvaluatorService,
+    private readonly evaluatorDashboardService: EvaluatorDashboardService,
+  ) {}
+
+  @Get('dashboard/home')
+  async getDashboardHome(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<EvaluatorDashboardHomeDto> {
+    return this.evaluatorDashboardService.getHome(request.user.sub);
+  }
 
   @Get('activities')
   async findAll(
+    @Req() request: AuthenticatedRequest,
     @Query() query: ListEvaluatorActivitiesQueryDto,
   ): Promise<PaginatedEvaluatorActivitiesResponseDto> {
-    return this.evaluatorService.findAllPaginated(query);
+    return this.evaluatorService.findAllPaginated(request.user.sub, query);
   }
 
   @Get('activities/evidences/:evidenceId/file')
@@ -62,9 +75,10 @@ export class EvaluatorController {
 
   @Get('activities/:id')
   async findById(
+    @Req() request: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<EvaluatorActivityDetailDto> {
-    return this.evaluatorService.findById(id);
+    return this.evaluatorService.findById(request.user.sub, id);
   }
 
   @Post('activities/:id/approve')

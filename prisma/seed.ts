@@ -102,6 +102,15 @@ const DEMO_USERS: SeedUserConfig[] = [
     currentLevel: 'II',
   },
   {
+    email: process.env.DOCENTE3_EMAIL ?? 'docente3@progressao.uf.br',
+    name: 'Patricia Souza',
+    roles: [Role.USER],
+    department: 'Departamento de Química',
+    university: 'Universidade Federal de Progressão',
+    careerClass: 'Professor',
+    currentLevel: 'II',
+  },
+  {
     email: process.env.REVISOR_EMAIL ?? 'revisor@progressao.uf.br',
     name: 'Maria Revisora',
     roles: [Role.EVALUATOR],
@@ -303,6 +312,39 @@ async function seedDemoActivities(
   });
 }
 
+async function seedEvaluatorAssignments(
+  prisma: PrismaClient,
+  userIds: Record<string, string>,
+  adminId: string,
+): Promise<void> {
+  const revisorEmail = process.env.REVISOR_EMAIL ?? 'revisor@progressao.uf.br';
+  const docente1Email = process.env.DOCENTE1_EMAIL ?? 'docente1@progressao.uf.br';
+  const docente2Email = process.env.DOCENTE2_EMAIL ?? 'docente2@progressao.uf.br';
+
+  const revisorId = userIds[revisorEmail];
+  const docente1Id = userIds[docente1Email];
+  const docente2Id = userIds[docente2Email];
+
+  if (!revisorId || !docente1Id || !docente2Id) {
+    return;
+  }
+
+  for (const teacherId of [docente1Id, docente2Id]) {
+    await prisma.evaluatorAssignment.upsert({
+      where: { teacherId },
+      update: {
+        evaluatorId: revisorId,
+        assignedById: adminId,
+      },
+      create: {
+        teacherId,
+        evaluatorId: revisorId,
+        assignedById: adminId,
+      },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   const prisma = createPrismaClient();
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
@@ -319,6 +361,7 @@ async function main(): Promise<void> {
     for (const email of [
       process.env.DOCENTE1_EMAIL ?? 'docente1@progressao.uf.br',
       process.env.DOCENTE2_EMAIL ?? 'docente2@progressao.uf.br',
+      process.env.DOCENTE3_EMAIL ?? 'docente3@progressao.uf.br',
     ]) {
       const userId = userIds[email];
       const cycle = await prisma.progressionCycle.findFirst({
@@ -328,6 +371,9 @@ async function main(): Promise<void> {
         await seedDemoActivities(prisma, userId, cycle.id);
       }
     }
+
+    const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@progressao.uf.br';
+    await seedEvaluatorAssignments(prisma, userIds, userIds[adminEmail]);
 
     // eslint-disable-next-line no-console
     console.log('Seed concluido com sucesso.');

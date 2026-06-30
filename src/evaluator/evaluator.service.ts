@@ -29,11 +29,12 @@ export class EvaluatorService {
   ) {}
 
   async findAllPaginated(
+    evaluatorId: string,
     query: ListEvaluatorActivitiesQueryDto,
   ): Promise<PaginatedEvaluatorActivitiesResponseDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
-    const where = this.buildWhere(query);
+    const where = await this.buildWhere(evaluatorId, query);
 
     const [activities, total] = await Promise.all([
       this.prisma.activity.findMany({
@@ -66,7 +67,10 @@ export class EvaluatorService {
     };
   }
 
-  async findById(activityId: string): Promise<EvaluatorActivityDetailDto> {
+  async findById(
+    evaluatorId: string,
+    activityId: string,
+  ): Promise<EvaluatorActivityDetailDto> {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
       include: {
@@ -96,6 +100,9 @@ export class EvaluatorService {
     if (!activity) {
       throw new NotFoundException('Atividade nao encontrada.');
     }
+
+    await this.assertAssignedTeacher(activity.userId, evaluatorId);
+    this.assertNotSelfReview(activity.userId, evaluatorId);
 
     return {
       id: activity.id,
@@ -152,6 +159,7 @@ export class EvaluatorService {
   ): Promise<ActivityDetailDto> {
     const activity = await this.getPendingActivity(activityId);
     this.assertNotSelfReview(activity.userId, evaluatorId);
+    await this.assertAssignedTeacher(activity.userId, evaluatorId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.activity.update({
@@ -217,6 +225,7 @@ export class EvaluatorService {
   ): Promise<ActivityDetailDto> {
     const activity = await this.getPendingActivity(activityId);
     this.assertNotSelfReview(activity.userId, evaluatorId);
+    await this.assertAssignedTeacher(activity.userId, evaluatorId);
 
     const reason = dto.rejectionReason.trim();
     if (!reason) {
@@ -298,17 +307,22 @@ export class EvaluatorService {
     }
 
     this.assertNotSelfReview(evidence.activity.userId, evaluatorId);
+    await this.assertAssignedTeacher(evidence.activity.userId, evaluatorId);
 
     return this.activitiesService.getEvidenceFile(evaluatorId, evidenceId, {
       allowEvaluatorAccess: true,
     });
   }
 
-  private buildWhere(
+  private async buildWhere(
+    evaluatorId: string,
     query: ListEvaluatorActivitiesQueryDto,
-  ): Prisma.ActivityWhereInput {
+  ): Promise<Prisma.ActivityWhereInput> {
+    const assignedTeacherIds = await this.getAssignedTeacherIds(evaluatorId);
+
     const where: Prisma.ActivityWhereInput = {
       status: (query.status as ActivityStatus) ?? ActivityStatus.PENDING,
+      userId: { in: assignedTeacherIds },
     };
 
     if (query.category) {
@@ -326,6 +340,30 @@ export class EvaluatorService {
     }
 
     return where;
+  }
+
+  private async getAssignedTeacherIds(evaluatorId: string): Promise<string[]> {
+    const assignments = await this.prisma.evaluatorAssignment.findMany({
+      where: { evaluatorId },
+      select: { teacherId: true },
+    });
+
+    return assignments.map((assignment) => assignment.teacherId);
+  }
+
+  private async assertAssignedTeacher(
+    teacherId: string,
+    evaluatorId: string,
+  ): Promise<void> {
+    const assignment = await this.prisma.evaluatorAssignment.findUnique({
+      where: { teacherId },
+    });
+
+    if (!assignment || assignment.evaluatorId !== evaluatorId) {
+      throw new ForbiddenException(
+        'Voce nao pode avaliar atividades deste docente.',
+      );
+    }
   }
 
   private async getPendingActivity(activityId: string) {

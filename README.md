@@ -156,10 +156,11 @@ Após isso, você pode fazer login com os usuários de demonstração do seed:
 
 | E-mail | Papéis | Uso |
 |--------|--------|-----|
-| `admin@progressao.uf.br` | ADMIN | Painel administrativo (`/admin/usuarios`) |
-| `docente1@progressao.uf.br` | USER | Docente com atividades pendentes |
-| `docente2@progressao.uf.br` | USER | Segundo docente na fila |
-| `revisor@progressao.uf.br` | EVALUATOR | Fila de avaliação (`/avaliador`) |
+| `admin@progressao.uf.br` | ADMIN | Dashboard admin (`/admin`), usuários e atribuições |
+| `docente1@progressao.uf.br` | USER | Docente vinculado ao revisor (atividades na fila) |
+| `docente2@progressao.uf.br` | USER | Docente vinculado ao revisor |
+| `docente3@progressao.uf.br` | USER | Docente **sem revisor** (pendências fora da fila) |
+| `revisor@progressao.uf.br` | EVALUATOR | Dashboard e fila (`/avaliador`, `/avaliador/fila`) |
 | `docente.revisor@progressao.uf.br` | USER + EVALUATOR | Menus docente e revisor |
 
 Senha padrão de todos os usuários do seed: `Seed@123456` (ou valor de `SEED_PASSWORD` / `ADMIN_PASSWORD` no `.env`).

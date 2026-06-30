@@ -81,8 +81,27 @@ model User {
   statusChanges      ActivityStatusHistory[] @relation("StatusChangedBy")
   activityChangeLogs ActivityChangeLog[]     @relation("ActivityChangedBy")
   reviewedChecklistItems UserChecklistItem[] @relation("ChecklistReviewer")
+  evaluatorAssignment    EvaluatorAssignment?  @relation("TeacherEvaluatorAssignment")
+  teacherAssignments     EvaluatorAssignment[] @relation("EvaluatorTeacherAssignments")
+  assignmentsCreated     EvaluatorAssignment[] @relation("AssignmentCreatedBy")
 
   @@map("users")
+}
+
+model EvaluatorAssignment {
+  id           String   @id @default(uuid())
+  teacherId    String   @unique @map("teacher_id")
+  evaluatorId  String   @map("evaluator_id")
+  assignedById String?  @map("assigned_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  teacher    User  @relation("TeacherEvaluatorAssignment", fields: [teacherId], references: [id], onDelete: Cascade)
+  evaluator  User  @relation("EvaluatorTeacherAssignments", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation("AssignmentCreatedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([evaluatorId])
+  @@map("evaluator_assignments")
 }
 
 model ProgressionCycle {
