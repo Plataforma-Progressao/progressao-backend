@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
+import { BaremaModule } from '../barema/barema.module';
 import {
   ActivitiesController,
   ActivitiesReportController,
@@ -9,6 +10,7 @@ import { activityEvidenceStorage } from './config/multer-storage';
 
 @Module({
   imports: [
+    BaremaModule,
     MulterModule.register({
       storage: activityEvidenceStorage,
     }),

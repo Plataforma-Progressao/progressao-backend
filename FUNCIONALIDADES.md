@@ -60,19 +60,21 @@ A plataforma está organizada em áreas funcionais acessíveis após autenticaç
 
 ## 4. Gestão de atividades
 
-Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce com status **APPROVED** (sem fluxo de aprovação manual por gerenciador).
+Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce com status **PENDING** e aguarda aprovação de um revisor (`EVALUATOR`). Apenas atividades **APPROVED** entram na pontuação do dashboard e no RAD.
 
 | Funcionalidade | Status | Descrição |
 | -------------- | ------ | --------- |
-| Cadastro de atividades | **Implementado** | Título, descrição, categoria, carga horária, tipo, período e pontuação |
-| Edição de atividades | **Implementado** | Mesmo formulário do cadastro, rota `/atividades/editar/:id` |
+| Cadastro de atividades | **Implementado** | Título, descrição, categoria, carga horária, tipo, período; pontuação recalculada no servidor |
+| Edição de atividades | **Implementado** | Mesmo formulário do cadastro, rota `/atividades/editar/:id`; reenvio para `PENDING` se estava aprovada/rejeitada |
 | Exclusão de atividades | **Implementado** | Remoção com confirmação na listagem |
 | Classificação por categoria | **Implementado** | Ensino, Pesquisa, Extensão e Gestão |
+| Classificação automática (barema) | **Implementado** | `POST /activities/classify` — sugestão de categoria/tipo/pontuação por keywords |
+| Otimizador de classificação ambígua | **Implementado** | `POST /activities/optimize-classification` — compara cenários quando há match em categorias distintas |
 | Listagem paginada | **Implementado** | Tabela com busca textual e paginação |
 | Filtro por abas de categoria | **Implementado** | Pesquisa, Ensino, Extensão, Gestão e Todas |
-| Filtro por status | **Parcial** | Mantido para compatibilidade com dados legados; novas atividades já nascem aprovadas |
+| Filtro por status | **Implementado** | PENDING, APPROVED, REJECTED |
 | Histórico de alterações por campo | **Implementado** | Log de auditoria (`ActivityChangeLog`) exibido na edição |
-| Histórico de status | **Implementado** | Modelo e API de `ActivityStatusHistory` (uso legado) |
+| Histórico de status | **Implementado** | Modelo e API de `ActivityStatusHistory` |
 | Associação a ciclo de progressão | **Implementado** | Atividades vinculadas ao ciclo ativo do docente |
 
 **Campos da atividade:** título, descrição, categoria, carga horária (formato duração), tipo, período/termo, pontuação calculada ou informada.
@@ -96,14 +98,14 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 
 | Funcionalidade | Status | Descrição |
 | -------------- | ------ | --------- |
-| Cálculo automático de pontuação por atividade | **Implementado** | Estimativa em tempo real no formulário (`POST /activities/estimate`) |
+| Cálculo automático de pontuação por atividade | **Implementado** | Estimativa via barema (`POST /activities/estimate`); score recalculado no create/update |
 | Agregação por pilar (categoria) | **Implementado** | Ensino, Pesquisa, Extensão e Gestão no dashboard |
-| Pontuação total vs. meta | **Implementado** | Meta padrão de 2.000 pontos no ciclo |
+| Pontuação total vs. meta | **Implementado** | Meta configurável no barema (padrão 2.000 pontos) |
 | Percentual de progresso | **Implementado** | Barra e indicadores no dashboard e no formulário de atividade |
 | Resumo persistido de pontuação | **Implementado** | Modelo `UserScoreSummary` e API dedicada |
-| Simulação de cenários | **Parcial** | Estimativa por atividade; sem simulador dedicado de múltiplos cenários |
-| Controle de teto de pontuação por pilar | **Planejado** | Regras configuráveis de barema ainda não parametrizáveis por instituição |
-| Barema configurável por instituição | **Planejado** | Previsto no planejamento; cálculo atual usa regras fixas no back-end |
+| Simulação de cenários | **Parcial** | Otimizador para classificação ambígua; sem simulador de biênio inteiro |
+| Controle de teto de pontuação por pilar | **Implementado** | `BaremaCategoryRule.ceilingScore`; alertas e barras no dashboard |
+| Barema configurável por instituição | **Implementado** | Admin em `/admin/barema`; seed demo com regras e tetos |
 
 **Indicadores de carreira no dashboard:** nível atual, próximo nível, tempo no nível, publicações Qualis, orientações e comparativo do biênio.
 
@@ -116,7 +118,7 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 | Visão geral personalizada | **Implementado** | Saudação, resumo e papel/nível do docente |
 | Card de pontuação total | **Implementado** | Pontuação atual e meta |
 | Card de evolução de carreira | **Implementado** | Progresso para próximo nível, anos no nível, Qualis e orientações |
-| Card de pilares | **Implementado** | Pontuação e percentual por categoria |
+| Card de pilares | **Implementado** | Pontuação, percentual, teto e alerta visual (≥90% / teto atingido) |
 | Card do biênio/ciclo | **Implementado** | Ciclo ativo, percentual de conclusão e comparativo departamental |
 | Notificações recentes | **Implementado** | Lista derivada de pendências e alertas do usuário |
 | Indicadores de progresso para próxima progressão | **Parcial** | Métricas exibidas; regras institucionais completas ainda simplificadas |
@@ -152,11 +154,12 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 
 | Funcionalidade | Status | Descrição |
 | -------------- | ------ | --------- |
-| Notificações no dashboard | **Implementado** | Alertas de pendências documentais e checklist |
-| Modelo de notificações persistentes | **Implementado** | Entidade `Notification` com tons (info, sucesso, aviso, erro) |
-| API de notificações | **Implementado** | CRUD e marcação de leitura |
-| Central de notificações dedicada | **Planejado** | Exibição atual concentrada no dashboard |
-| Alertas de pontuação mínima | **Parcial** | Indicadores visuais no dashboard; sem push/e-mail |
+| Notificações no dashboard | **Implementado** | Alertas de pendências, checklist e tetos de pilar |
+| Modelo de notificações persistentes | **Implementado** | Entidade `Notification` com tons e campo `kind` para dedupe |
+| API de notificações | **Implementado** | `GET /notifications`, unread-count, marcar como lida (JWT user-scoped) |
+| Badge de notificações no header | **Implementado** | Dropdown com últimas notificações e contador no shell autenticado |
+| Central de notificações dedicada | **Planejado** | Rota `/notificacoes` futura; hoje via header e dashboard |
+| Alertas de teto por pilar | **Implementado** | Notificação `WARNING` ao atingir/projetar teto (RF007) |
 
 ---
 
@@ -179,6 +182,7 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 | Dashboard administrativo | **Implementado** | `GET /api/admin/dashboard/home` e `/admin` no front-end |
 | Listagem e gestão de usuários | **Implementado** | `GET/POST/PATCH /api/admin/users` e `/admin/usuarios` |
 | Atribuição revisor-docente | **Implementado** | `GET/PUT/DELETE /api/admin/evaluator-assignments` e `/admin/atribuicoes` |
+| Gestão do barema | **Implementado** | `GET/PATCH /api/admin/barema/*` e `/admin/barema` |
 | Alerta de docentes sem revisor | **Implementado** | KPIs no dashboard admin (atividades órfãs fora da fila) |
 
 ---
@@ -190,6 +194,7 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 | Dashboard do revisor | **Implementado** | `GET /api/evaluator/dashboard/home` e `/avaliador` |
 | Fila de avaliação | **Implementado** | `/avaliador/fila` — somente docentes atribuídos |
 | Aprovar/rejeitar atividades | **Implementado** | Com bloqueio de auto-avaliação |
+| Revisão de checklist documental | **Implementado** | `/avaliador/checklist` — aprovar/rejeitar itens de docentes atribuídos |
 | Filtro por atribuição | **Implementado** | Revisor vê apenas docentes vinculados pelo admin |
 
 ---
@@ -217,8 +222,8 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 | ---------------- | -------------- |
 | Cadastro e gerenciamento de atividades docentes | **Atendido** |
 | Centralizar documentos comprobatórios | **Parcialmente atendido** — upload por atividade e checklist; armazenamento em nuvem pendente |
-| Automatizar cálculos de pontuação | **Parcialmente atendido** — estimativa e agregação implementadas; barema configurável pendente |
-| Regras configuráveis de barema | **Pendente** |
+| Automatizar cálculos de pontuação | **Atendido** — motor de barema com classificação e tetos |
+| Regras configuráveis de barema | **Atendido** — admin CRUD + seed |
 | Indicadores de progresso para a próxima progressão | **Parcialmente atendido** — dashboard com métricas de carreira e pontuação |
 | Relatórios em PDF | **Atendido** |
 | Notificações e alertas de pendências | **Parcialmente atendido** — dashboard e modelo de notificações |
@@ -252,9 +257,13 @@ Atividades são o núcleo do RAD e da pontuação. Toda atividade criada nasce c
 
 ## 16. Regras de domínio relevantes
 
-- **Não há fluxo de aprovação manual por gerenciador.** Toda atividade criada nasce com status `APPROVED`.
-- **Não implementar telas ou endpoints de revisão/aprovação/rejeição de atividades**, salvo pedido explícito.
-- O **filtro de status** na listagem de atividades permanece apenas para compatibilidade com dados legados.
+- Toda atividade criada nasce com status **`PENDING`** e aguarda aprovação de um revisor (`EVALUATOR`).
+- Apenas atividades **`APPROVED`** entram na pontuação do dashboard e no RAD.
+- Revisores não podem aprovar/rejeitar as próprias atividades.
+- Edição de atividade `APPROVED` ou `REJECTED` reenvia para `PENDING`.
+- Pontuação é **recalculada no servidor** com base no barema ativo (não confiar cegamente no score do client).
+- Tetos por pilar (`ceilingScore`) geram alertas quando atingidos ou projetados.
+- Revisores também podem aprovar/rejeitar **itens do checklist documental** dos docentes atribuídos.
 
 ---
 

@@ -4,6 +4,9 @@ export interface DashboardHomePillarDto {
   readonly total: number;
   readonly percentage: number;
   readonly accent: string;
+  readonly ceiling: number;
+  readonly remaining: number;
+  readonly atCeiling: boolean;
 }
 
 export type DashboardNotificationTone = 'warning' | 'success' | 'info';

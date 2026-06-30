@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityCategory, ActivityStatus } from '@prisma/client';
+import { ActivityCategory, ActivityStatus, ChecklistItemStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvaluatorDashboardHomeDto } from './dto/evaluator-dashboard-home.dto';
 
@@ -35,6 +35,7 @@ export class EvaluatorDashboardService {
 
     const [
       pendingCount,
+      pendingChecklistCount,
       approvedLast30Days,
       rejectedLast30Days,
       pendingActivities,
@@ -46,6 +47,16 @@ export class EvaluatorDashboardService {
             where: {
               status: ActivityStatus.PENDING,
               userId: { in: teacherIds },
+            },
+          }),
+      teacherIds.length === 0
+        ? 0
+        : this.prisma.userChecklistItem.count({
+            where: {
+              userId: { in: teacherIds },
+              status: {
+                in: [ChecklistItemStatus.PENDING, ChecklistItemStatus.ATTENTION],
+              },
             },
           }),
       teacherIds.length === 0
@@ -103,6 +114,7 @@ export class EvaluatorDashboardService {
       summaryStats: {
         assignedTeacherCount: teacherIds.length,
         pendingCount,
+        pendingChecklistCount,
         approvedLast30Days,
         rejectedLast30Days,
       },

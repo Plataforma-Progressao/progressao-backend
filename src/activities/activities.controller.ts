@@ -30,6 +30,10 @@ import { ListActivitiesQueryDto } from './dto/list-activities-query.dto';
 import { PaginatedActivitiesResponseDto } from './dto/paginated-activities-response.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { EstimateActivityScoreDto } from './dto/estimate-activity-score.dto';
+import {
+  ClassifyActivityDto,
+  OptimizeClassificationDto,
+} from './dto/classify-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivitiesService } from './activities.service';
 import type { UploadedEvidenceFile } from './types/uploaded-evidence-file';
@@ -60,6 +64,21 @@ export class ActivitiesController {
     @Query() query: ListActivitiesQueryDto,
   ): Promise<PaginatedActivitiesResponseDto> {
     return this.activitiesService.findAllPaginated(request.user.sub, query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('classify')
+  async classify(@Body() dto: ClassifyActivityDto) {
+    return this.activitiesService.classify(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('optimize-classification')
+  async optimizeClassification(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: OptimizeClassificationDto,
+  ) {
+    return this.activitiesService.optimizeClassification(request.user.sub, dto);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -345,12 +345,142 @@ async function seedEvaluatorAssignments(
   }
 }
 
+async function seedBarema(prisma: PrismaClient): Promise<void> {
+  const config = await prisma.baremaConfig.upsert({
+    where: { university: 'UF Demo' },
+    update: { isActive: true, scoreTarget: 2000 },
+    create: {
+      university: 'UF Demo',
+      scoreTarget: 2000,
+      isActive: true,
+    },
+  });
+
+  const categoryRules = [
+    {
+      category: ActivityCategory.TEACHING,
+      baseScore: 10,
+      workloadMultiplier: 0.0625,
+      ceilingScore: 800,
+      minimumTarget: 400,
+    },
+    {
+      category: ActivityCategory.RESEARCH,
+      baseScore: 15,
+      workloadMultiplier: 0.0625,
+      ceilingScore: 1000,
+      minimumTarget: 500,
+    },
+    {
+      category: ActivityCategory.OUTREACH,
+      baseScore: 12,
+      workloadMultiplier: 0.0625,
+      ceilingScore: 600,
+      minimumTarget: 200,
+    },
+    {
+      category: ActivityCategory.MANAGEMENT,
+      baseScore: 8,
+      workloadMultiplier: 0.0625,
+      ceilingScore: 400,
+      minimumTarget: 100,
+    },
+  ] as const;
+
+  for (const rule of categoryRules) {
+    await prisma.baremaCategoryRule.upsert({
+      where: {
+        baremaConfigId_category: {
+          baremaConfigId: config.id,
+          category: rule.category,
+        },
+      },
+      update: {
+        baseScore: rule.baseScore,
+        workloadMultiplier: rule.workloadMultiplier,
+        ceilingScore: rule.ceilingScore,
+        minimumTarget: rule.minimumTarget,
+      },
+      create: {
+        baremaConfigId: config.id,
+        ...rule,
+      },
+    });
+  }
+
+  const activityRules = [
+    {
+      category: ActivityCategory.TEACHING,
+      kind: 'Disciplina ministrada',
+      keywords: ['disciplina', 'ensino', 'aula', 'graduacao'],
+      fixedScore: 10,
+      priority: 10,
+    },
+    {
+      category: ActivityCategory.RESEARCH,
+      kind: 'Publicacao Qualis A1',
+      keywords: ['qualis', 'publicacao', 'artigo', 'revista'],
+      fixedScore: 15,
+      priority: 20,
+    },
+    {
+      category: ActivityCategory.OUTREACH,
+      kind: 'Projeto de extensao',
+      keywords: ['extensao', 'comunidade', 'projeto'],
+      fixedScore: 12,
+      priority: 15,
+    },
+    {
+      category: ActivityCategory.MANAGEMENT,
+      kind: 'Coordenacao de curso',
+      keywords: ['coordenacao', 'gestao', 'direcao'],
+      fixedScore: 8,
+      priority: 12,
+    },
+  ] as const;
+
+  for (const rule of activityRules) {
+    const existing = await prisma.baremaActivityRule.findFirst({
+      where: {
+        baremaConfigId: config.id,
+        kind: rule.kind,
+        category: rule.category,
+      },
+    });
+
+    if (existing) {
+      await prisma.baremaActivityRule.update({
+        where: { id: existing.id },
+        data: {
+          keywords: [...rule.keywords],
+          fixedScore: rule.fixedScore,
+          priority: rule.priority,
+          isActive: true,
+        },
+      });
+    } else {
+      await prisma.baremaActivityRule.create({
+        data: {
+          baremaConfigId: config.id,
+          category: rule.category,
+          kind: rule.kind,
+          keywords: [...rule.keywords],
+          fixedScore: rule.fixedScore,
+          priority: rule.priority,
+          isActive: true,
+        },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const prisma = createPrismaClient();
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
 
   try {
     await seedChecklistTemplates(prisma);
+    await seedBarema(prisma);
 
     const userIds: Record<string, string> = {};
 

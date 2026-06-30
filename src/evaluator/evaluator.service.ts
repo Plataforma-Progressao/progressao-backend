@@ -7,18 +7,24 @@ import {
 import {
   ActivityCategory,
   ActivityStatus,
+  ChecklistItemStatus,
   NotificationTone,
   Prisma,
   Role as PrismaRole,
 } from '@prisma/client';
 import { Role } from '../common/enums/role.enum';
 import { ActivitiesService } from '../activities/activities.service';
+import { CeilingService } from '../barema/ceiling.service';
 import { ActivityListItemDto } from '../activities/dto/list-activities.dto';
 import { ActivityDetailDto } from '../activities/dto/activity-detail.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListEvaluatorActivitiesQueryDto } from './dto/list-evaluator-activities-query.dto';
 import { PaginatedEvaluatorActivitiesResponseDto } from './dto/paginated-evaluator-activities-response.dto';
 import { RejectActivityDto } from './dto/reject-activity.dto';
+import {
+  ListEvaluatorChecklistQueryDto,
+  RejectChecklistItemDto,
+} from './dto/evaluator-checklist.dto';
 import { EvaluatorActivityDetailDto } from './dto/evaluator-activity-detail.dto';
 
 @Injectable()
@@ -26,6 +32,7 @@ export class EvaluatorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
+    private readonly ceilingService: CeilingService,
   ) {}
 
   async findAllPaginated(
@@ -196,6 +203,12 @@ export class EvaluatorService {
       return result;
     });
 
+    await this.ceilingService.checkAndNotifyAfterApproval(
+      activity.userId,
+      activity.progressionCycleId,
+      activity.category,
+    );
+
     return {
       id: updated.id,
       title: updated.title,
@@ -312,6 +325,153 @@ export class EvaluatorService {
     return this.activitiesService.getEvidenceFile(evaluatorId, evidenceId, {
       allowEvaluatorAccess: true,
     });
+  }
+
+  async findChecklistItems(
+    evaluatorId: string,
+    query: ListEvaluatorChecklistQueryDto,
+  ) {
+    const teacherIds = await this.getAssignedTeacherIds(evaluatorId);
+    if (teacherIds.length === 0) {
+      return [];
+    }
+
+    if (query.teacherId && !teacherIds.includes(query.teacherId)) {
+      return [];
+    }
+
+    const statuses = query.status
+      ? [query.status]
+      : [ChecklistItemStatus.PENDING, ChecklistItemStatus.ATTENTION];
+
+    const items = await this.prisma.userChecklistItem.findMany({
+      where: {
+        userId: query.teacherId ?? { in: teacherIds },
+        status: { in: statuses },
+      },
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        user: { select: { id: true, name: true, email: true, department: true } },
+        templateItem: { select: { id: true, title: true, description: true, category: true } },
+      },
+    });
+
+    return items.map((item) => ({
+      id: item.id,
+      status: item.status,
+      note: item.note,
+      submittedAt: item.submittedAt?.toISOString() ?? null,
+      teacher: item.user,
+      template: item.templateItem,
+    }));
+  }
+
+  async findChecklistItemById(evaluatorId: string, itemId: string) {
+    const item = await this.prisma.userChecklistItem.findUnique({
+      where: { id: itemId },
+      include: {
+        user: { select: { id: true, name: true, email: true, department: true } },
+        templateItem: true,
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item de checklist nao encontrado.');
+    }
+
+    await this.assertAssignedTeacher(item.userId, evaluatorId);
+
+    return {
+      id: item.id,
+      status: item.status,
+      note: item.note,
+      submittedAt: item.submittedAt?.toISOString() ?? null,
+      reviewedAt: item.reviewedAt?.toISOString() ?? null,
+      teacher: item.user,
+      template: item.templateItem,
+    };
+  }
+
+  async approveChecklistItem(evaluatorId: string, itemId: string) {
+    const item = await this.getReviewableChecklistItem(itemId, evaluatorId);
+
+    const updated = await this.prisma.userChecklistItem.update({
+      where: { id: itemId },
+      data: {
+        status: ChecklistItemStatus.COMPLETED,
+        reviewedAt: new Date(),
+        reviewerId: evaluatorId,
+        note: null,
+      },
+      include: {
+        templateItem: { select: { title: true } },
+      },
+    });
+
+    await this.prisma.notification.create({
+      data: {
+        userId: item.userId,
+        title: 'Checklist aprovado',
+        message: `O item "${updated.templateItem.title}" foi aprovado pelo revisor.`,
+        icon: 'check_circle',
+        tone: NotificationTone.SUCCESS,
+      },
+    });
+
+    return { id: updated.id, status: updated.status };
+  }
+
+  async rejectChecklistItem(
+    evaluatorId: string,
+    itemId: string,
+    dto: RejectChecklistItemDto,
+  ) {
+    const item = await this.getReviewableChecklistItem(itemId, evaluatorId);
+
+    const updated = await this.prisma.userChecklistItem.update({
+      where: { id: itemId },
+      data: {
+        status: ChecklistItemStatus.ATTENTION,
+        reviewedAt: new Date(),
+        reviewerId: evaluatorId,
+        note: dto.note.trim(),
+      },
+      include: {
+        templateItem: { select: { title: true } },
+      },
+    });
+
+    await this.prisma.notification.create({
+      data: {
+        userId: item.userId,
+        title: 'Checklist requer atencao',
+        message: `O item "${updated.templateItem.title}" precisa de ajustes: ${dto.note.trim()}`,
+        icon: 'error',
+        tone: NotificationTone.ERROR,
+      },
+    });
+
+    return { id: updated.id, status: updated.status, note: updated.note };
+  }
+
+  private async getReviewableChecklistItem(itemId: string, evaluatorId: string) {
+    const item = await this.prisma.userChecklistItem.findUnique({
+      where: { id: itemId },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item de checklist nao encontrado.');
+    }
+
+    if (
+      item.status !== ChecklistItemStatus.PENDING &&
+      item.status !== ChecklistItemStatus.ATTENTION
+    ) {
+      throw new BadRequestException('Este item nao esta pendente de revisao.');
+    }
+
+    await this.assertAssignedTeacher(item.userId, evaluatorId);
+    return item;
   }
 
   private async buildWhere(

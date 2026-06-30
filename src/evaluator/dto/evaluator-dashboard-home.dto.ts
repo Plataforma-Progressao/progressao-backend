@@ -1,6 +1,7 @@
 export class EvaluatorDashboardSummaryDto {
   assignedTeacherCount!: number;
   pendingCount!: number;
+  pendingChecklistCount!: number;
   approvedLast30Days!: number;
   rejectedLast30Days!: number;
 }

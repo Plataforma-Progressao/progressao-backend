@@ -53,4 +53,8 @@ export class UpdateActivityDto {
   @IsString()
   @MaxLength(120)
   kind?: string;
+
+  @IsOptional()
+  @IsString()
+  matchedRuleId?: string;
 }

@@ -6,6 +6,11 @@ import {
 import { Prisma } from '@prisma/client';
 import { existsSync, unlinkSync } from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
+import { BaremaService } from '../barema/barema.service';
+import { ClassificationService } from '../barema/classification.service';
+import { CeilingService } from '../barema/ceiling.service';
+import { OptimizerService } from '../barema/optimizer.service';
+import { ScoringEngineService } from '../barema/scoring-engine.service';
 import { ActivityChangeLogListDto } from './dto/activity-change-log.dto';
 import { ActivityDetailDto } from './dto/activity-detail.dto';
 import { ActivityEvidenceDto } from './dto/activity-evidence.dto';
@@ -17,6 +22,7 @@ import { ListActivitiesQueryDto } from './dto/list-activities-query.dto';
 import { PaginatedActivitiesResponseDto } from './dto/paginated-activities-response.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { EstimateActivityScoreDto } from './dto/estimate-activity-score.dto';
+import { ClassifyActivityDto, OptimizeClassificationDto } from './dto/classify-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { UploadedEvidenceFile } from './types/uploaded-evidence-file';
 import { resolveEvidenceAbsolutePath } from './config/multer-storage';
@@ -162,7 +168,14 @@ type PrismaWithChangeLog = PrismaService & {
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scoringEngine: ScoringEngineService,
+    private readonly baremaService: BaremaService,
+    private readonly classificationService: ClassificationService,
+    private readonly ceilingService: CeilingService,
+    private readonly optimizerService: OptimizerService,
+  ) {}
 
   private get prismaClient(): PrismaWithChangeLog {
     return this.prisma as PrismaWithChangeLog;
@@ -284,6 +297,11 @@ export class ActivitiesService {
   ): Promise<ActivityListItemDto> {
     const activeCycleId = await this.resolveActiveCycleId(userId);
     const created = creationChangeEntry();
+    const { score } = await this.scoringEngine.estimateScore(
+      dto.category,
+      dto.workloadHours,
+      dto.matchedRuleId,
+    );
 
     const activity = await this.prisma.activity.create({
       data: {
@@ -293,7 +311,7 @@ export class ActivitiesService {
         description: dto.description.trim(),
         category: dto.category,
         workloadHours: new Prisma.Decimal(dto.workloadHours),
-        score: new Prisma.Decimal(dto.score),
+        score: new Prisma.Decimal(score),
         term: dto.term?.trim() || null,
         kind: dto.kind?.trim() || null,
         status: 'PENDING',
@@ -325,6 +343,13 @@ export class ActivitiesService {
       },
     });
 
+    await this.ceilingService.checkProjectedCeilingOnCreate(
+      userId,
+      activeCycleId,
+      dto.category,
+      score,
+    );
+
     return this.toListItem(activity);
   }
 
@@ -343,15 +368,23 @@ export class ActivitiesService {
 
     const before = snapshotFromActivity(existing);
 
+    const category = dto.category ?? existing.category;
+    const workloadHours =
+      dto.workloadHours === undefined
+        ? Number(existing.workloadHours)
+        : dto.workloadHours;
+    const { score } = await this.scoringEngine.estimateScore(
+      category as CreateActivityDto['category'],
+      workloadHours,
+      dto.matchedRuleId,
+    );
+
     const merged = {
       title: dto.title?.trim() ?? existing.title,
       description: dto.description?.trim() ?? existing.description,
-      category: dto.category ?? existing.category,
-      workloadHours:
-        dto.workloadHours === undefined
-          ? Number(existing.workloadHours)
-          : dto.workloadHours,
-      score: dto.score === undefined ? Number(existing.score) : dto.score,
+      category,
+      workloadHours,
+      score,
       term: dto.term === undefined ? existing.term : dto.term?.trim() || null,
       kind: dto.kind === undefined ? existing.kind : dto.kind?.trim() || null,
     };
@@ -523,29 +556,48 @@ export class ActivitiesService {
     };
   }
 
-  estimateScore(dto: EstimateActivityScoreDto): {
+  async estimateScore(dto: EstimateActivityScoreDto): Promise<{
     baseCategory: number;
     workloadFactor: number;
     totalImpact: number;
     progressPercentage: number;
-  } {
-    const baseCategory = this.baseScoreForCategory(dto.category);
-    const workloadFactor = Math.max(
-      0,
-      Number((dto.workloadHours * 0.0625).toFixed(1)),
+    matchedRuleId: string | null;
+  }> {
+    const { score, matchedRuleId } = await this.scoringEngine.estimateScore(
+      dto.category,
+      dto.workloadHours,
+      dto.matchedRuleId,
     );
-    const totalImpact = Number((baseCategory + workloadFactor).toFixed(1));
+    const config = await this.baremaService.getActiveConfig();
+    const categoryRule = this.baremaService.getCategoryRule(config, dto.category);
+    const baseCategory = Number(categoryRule.baseScore);
+    const multiplier = Number(categoryRule.workloadMultiplier);
+    const workloadFactor = Number((dto.workloadHours * multiplier).toFixed(1));
     const progressPercentage = Math.min(
       100,
-      Math.round((totalImpact / 150) * 100),
+      Math.round((score / 150) * 100),
     );
 
     return {
       baseCategory,
       workloadFactor,
-      totalImpact,
+      totalImpact: score,
       progressPercentage,
+      matchedRuleId,
     };
+  }
+
+  async classify(dto: ClassifyActivityDto) {
+    return this.classificationService.classify(dto);
+  }
+
+  async optimizeClassification(userId: string, dto: OptimizeClassificationDto) {
+    const cycleId = await this.resolveActiveCycleId(userId);
+    return this.optimizerService.optimize({
+      ...dto,
+      userId,
+      cycleId,
+    });
   }
 
   private buildListWhere(
@@ -615,21 +667,6 @@ export class ActivitiesService {
       throw new BadRequestException(
         'Selecione arquivos PDF, PNG ou JPG com até 10MB.',
       );
-    }
-  }
-
-  private baseScoreForCategory(category: string): number {
-    switch (category) {
-      case 'TEACHING':
-        return 10;
-      case 'RESEARCH':
-        return 15;
-      case 'OUTREACH':
-        return 12;
-      case 'MANAGEMENT':
-        return 8;
-      default:
-        return 0;
     }
   }
 

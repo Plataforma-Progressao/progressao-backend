@@ -6,6 +6,7 @@ import {
   NotificationTone,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BaremaService, BaremaConfigWithRules } from '../barema/barema.service';
 import {
   DashboardHomeDto,
   DashboardHomeNotificationDto,
@@ -43,7 +44,10 @@ const PILLAR_DEFINITIONS: readonly {
 
 @Injectable()
 export class DashboardAggregationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly baremaService: BaremaService,
+  ) {}
 
   async buildHome(user: DashboardUserProfile): Promise<DashboardHomeDto> {
     const approvedActivities = await this.prisma.activity.findMany({
@@ -58,9 +62,12 @@ export class DashboardAggregationService {
       },
     });
 
-    const pillars = this.buildPillars(approvedActivities);
+    const baremaConfig = await this.baremaService.getActiveConfig().catch(() => null);
+    const scoreTarget = baremaConfig?.scoreTarget ?? SCORE_TARGET;
+
+    const pillars = this.buildPillars(approvedActivities, baremaConfig);
     const scoreCurrent = pillars.reduce((sum, pillar) => sum + pillar.score, 0);
-    const progressPercentage = this.computeProgressPercentage(scoreCurrent);
+    const progressPercentage = this.computeProgressPercentage(scoreCurrent, scoreTarget);
 
     const activeCycle = await this.prisma.progressionCycle.findFirst({
       where: { userId: user.id, isActive: true },
@@ -103,7 +110,7 @@ export class DashboardAggregationService {
       summary: `Boas-vindas, ${user.name}. Suas métricas de progressão estão atualizadas.`,
       score: {
         current: scoreCurrent,
-        target: SCORE_TARGET,
+        target: scoreTarget,
       },
       career: {
         currentLevelLabel,
@@ -124,6 +131,7 @@ export class DashboardAggregationService {
 
   private buildPillars(
     activities: readonly { category: ActivityCategory; score: unknown }[],
+    baremaConfig: BaremaConfigWithRules | null,
   ): DashboardHomePillarDto[] {
     const scoresByCategory = new Map<ActivityCategory, number>();
 
@@ -146,6 +154,12 @@ export class DashboardAggregationService {
       ) / 100;
       const percentage =
         totalScore > 0 ? Math.round((score / totalScore) * 100) : 0;
+      const categoryRule = baremaConfig?.categoryRules.find(
+        (rule) => rule.category === definition.category,
+      );
+      const ceiling = Number(categoryRule?.ceilingScore ?? 0);
+      const remaining = ceiling > 0 ? Math.max(0, ceiling - score) : 0;
+      const atCeiling = ceiling > 0 && score >= ceiling;
 
       return {
         label: definition.label,
@@ -153,16 +167,19 @@ export class DashboardAggregationService {
         total: score,
         percentage,
         accent: definition.accent,
+        ceiling,
+        remaining,
+        atCeiling,
       };
     });
   }
 
-  private computeProgressPercentage(scoreCurrent: number): number {
-    if (SCORE_TARGET <= 0) {
+  private computeProgressPercentage(scoreCurrent: number, scoreTarget = SCORE_TARGET): number {
+    if (scoreTarget <= 0) {
       return 0;
     }
 
-    return Math.min(100, Math.round((scoreCurrent / SCORE_TARGET) * 100));
+    return Math.min(100, Math.round((scoreCurrent / scoreTarget) * 100));
   }
 
   private computeYearsInLevel(lastProgressionDate: Date | null): number {

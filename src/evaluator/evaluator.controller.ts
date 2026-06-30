@@ -25,6 +25,10 @@ import { EvaluatorDashboardHomeDto } from './dto/evaluator-dashboard-home.dto';
 import { ListEvaluatorActivitiesQueryDto } from './dto/list-evaluator-activities-query.dto';
 import { PaginatedEvaluatorActivitiesResponseDto } from './dto/paginated-evaluator-activities-response.dto';
 import { RejectActivityDto } from './dto/reject-activity.dto';
+import {
+  ListEvaluatorChecklistQueryDto,
+  RejectChecklistItemDto,
+} from './dto/evaluator-checklist.dto';
 import { EvaluatorActivityDetailDto } from './dto/evaluator-activity-detail.dto';
 
 type AuthenticatedRequest = Request & { user: JwtPayload };
@@ -43,6 +47,45 @@ export class EvaluatorController {
     @Req() request: AuthenticatedRequest,
   ): Promise<EvaluatorDashboardHomeDto> {
     return this.evaluatorDashboardService.getHome(request.user.sub);
+  }
+
+  @Get('checklist')
+  async findChecklist(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: ListEvaluatorChecklistQueryDto,
+  ) {
+    return this.evaluatorService.findChecklistItems(request.user.sub, query);
+  }
+
+  @Get('checklist/:itemId')
+  async findChecklistById(
+    @Req() request: AuthenticatedRequest,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.evaluatorService.findChecklistItemById(request.user.sub, itemId);
+  }
+
+  @Post('checklist/:itemId/approve')
+  @HttpCode(HttpStatus.OK)
+  async approveChecklist(
+    @Req() request: AuthenticatedRequest,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.evaluatorService.approveChecklistItem(request.user.sub, itemId);
+  }
+
+  @Post('checklist/:itemId/reject')
+  @HttpCode(HttpStatus.OK)
+  async rejectChecklist(
+    @Req() request: AuthenticatedRequest,
+    @Param('itemId') itemId: string,
+    @Body() dto: RejectChecklistItemDto,
+  ) {
+    return this.evaluatorService.rejectChecklistItem(
+      request.user.sub,
+      itemId,
+      dto,
+    );
   }
 
   @Get('activities')

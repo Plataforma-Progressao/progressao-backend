@@ -522,6 +522,44 @@ export class AdminController {
 | GET    | `/users/me` | Obter perfil do usuário autenticado | ✅ JWT       | Qualquer |
 | GET    | `/users`    | Listar todos os usuários            | ✅ JWT       | ADMIN    |
 
+### Notificações (usuário autenticado)
+
+| Método | Endpoint                      | Descrição                    | Autenticação |
+| ------ | ----------------------------- | ---------------------------- | ------------ |
+| GET    | `/notifications`              | Listar notificações (paginado) | ✅ JWT     |
+| GET    | `/notifications/unread-count` | Contagem de não lidas        | ✅ JWT       |
+| PATCH  | `/notifications/:id/read`     | Marcar uma como lida         | ✅ JWT       |
+| PATCH  | `/notifications/read-all`     | Marcar todas como lidas      | ✅ JWT       |
+
+### Atividades (barema)
+
+| Método | Endpoint                              | Descrição                         | Autenticação |
+| ------ | ------------------------------------- | --------------------------------- | ------------ |
+| POST   | `/activities/classify`                | Sugestão de classificação (RF004) | ✅ JWT       |
+| POST   | `/activities/optimize-classification` | Cenários ambíguos (RF008)         | ✅ JWT       |
+| POST   | `/activities/estimate`                | Estimativa com regra opcional     | ✅ JWT       |
+
+### Admin — Barema
+
+| Método | Endpoint                              | Descrição              | Autenticação | Role  |
+| ------ | ------------------------------------- | ---------------------- | ------------ | ----- |
+| GET    | `/admin/barema/config`                | Config + regras ativas | ✅ JWT       | ADMIN |
+| PATCH  | `/admin/barema/config`                | Atualizar meta global  | ✅ JWT       | ADMIN |
+| PATCH  | `/admin/barema/category-rules/:category` | Tetos e multiplicadores | ✅ JWT    | ADMIN |
+| GET    | `/admin/barema/activity-rules`        | Listar regras          | ✅ JWT       | ADMIN |
+| POST   | `/admin/barema/activity-rules`        | Criar regra            | ✅ JWT       | ADMIN |
+| PATCH  | `/admin/barema/activity-rules/:id`    | Atualizar regra        | ✅ JWT       | ADMIN |
+| DELETE | `/admin/barema/activity-rules/:id`    | Remover regra          | ✅ JWT       | ADMIN |
+
+### Avaliador — Checklist (RF013)
+
+| Método | Endpoint                           | Descrição              | Autenticação | Role      |
+| ------ | ---------------------------------- | ---------------------- | ------------ | --------- |
+| GET    | `/evaluator/checklist`             | Itens pendentes        | ✅ JWT       | EVALUATOR |
+| GET    | `/evaluator/checklist/:itemId`     | Detalhe do item        | ✅ JWT       | EVALUATOR |
+| POST   | `/evaluator/checklist/:itemId/approve` | Aprovar → COMPLETED | ✅ JWT       | EVALUATOR |
+| POST   | `/evaluator/checklist/:itemId/reject`  | Rejeitar → ATTENTION | ✅ JWT      | EVALUATOR |
+
 ## 🗄️ Banco de Dados
 
 ### Schema Prisma
