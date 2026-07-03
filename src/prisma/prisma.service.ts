@@ -14,7 +14,12 @@ export class PrismaService
       throw new Error('DATABASE_URL is required to initialize Prisma client.');
     }
 
-    const adapter = new PrismaPg({ connectionString });
+    const adapter = new PrismaPg({
+      connectionString,
+      max: 5,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000,
+    });
     super({ adapter });
   }
 
