@@ -1,6 +1,12 @@
 export type ActivityCategory = 'TEACHING' | 'RESEARCH' | 'OUTREACH' | 'MANAGEMENT';
 export type ActivityStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
 
+export interface ReportEvidenceDto {
+  readonly id: string;
+  readonly originalName: string;
+  readonly mimeType: string | null;
+}
+
 export interface ActivityListItemDto {
   readonly id: string;
   readonly title: string;
@@ -13,6 +19,7 @@ export interface ActivityListItemDto {
   readonly kind: string;
   readonly rejectionReason?: string | null;
   readonly submittedAt?: string | null;
+  readonly evidences?: readonly ReportEvidenceDto[];
 }
 
 export interface ReportTeacherProfileDto {

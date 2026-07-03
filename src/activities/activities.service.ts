@@ -214,10 +214,36 @@ export class ActivitiesService {
 
     const activities = await this.findActivitiesForReport(userId, cycle?.id ?? null);
 
+    const activityIds = activities
+      .filter((a) => a.status === 'APPROVED')
+      .map((a) => a.id);
+
+    const evidences =
+      activityIds.length > 0
+        ? await this.prisma.activityEvidence.findMany({
+            where: { activityId: { in: activityIds } },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [];
+
+    const evidencesByActivity = new Map<string, typeof evidences>();
+    for (const evidence of evidences) {
+      const list = evidencesByActivity.get(evidence.activityId) ?? [];
+      list.push(evidence);
+      evidencesByActivity.set(evidence.activityId, list);
+    }
+
     return {
       userData: this.buildReportUserProfile(user),
       metadata: this.buildReportMetadata(user, cycle, activities),
-      activities: activities.map((activity) => this.toListItem(activity)),
+      activities: activities.map((activity) => ({
+        ...this.toListItem(activity),
+        evidences: (evidencesByActivity.get(activity.id) ?? []).map((e) => ({
+          id: e.id,
+          originalName: e.originalName ?? e.filename ?? 'Comprovante',
+          mimeType: e.mimeType,
+        })),
+      })),
     };
   }
 
